@@ -1,6 +1,6 @@
-# OneNote Copilot
+# OneNote AI Assistant
 
-A Microsoft OneNote COM Add-in that integrates DeepSeek AI to provide an intelligent AI Copilot experience directly inside OneNote.
+A Microsoft OneNote COM Add-in that integrates DeepSeek AI to provide an intelligent AI Assistant experience directly inside OneNote.
 
 ## Features
 
@@ -22,24 +22,24 @@ A Microsoft OneNote COM Add-in that integrates DeepSeek AI to provide an intelli
 ## Installation
 
 1. **Build the add-in** using Visual Studio 2022 (or later):
-   - Open `OneNoteCopilot.sln`
+   - Open `OneNoteAI.sln`
    - Build the solution in Release mode
 
 2. **Register the add-in**:
-   - Run the built installer from `src/OneNoteCopilot.Installer/Output/`
+   - Run the built installer from `src/OneNoteAI.Installer/Output/`
    - Or manually register via `regasm`
 
-3. **Restart OneNote** — the Copilot ribbon tab will appear.
+3. **Restart OneNote** — the AI Assistant ribbon tab will appear.
 
 4. **Configure your API key**:
-   - Click the **Settings** button in the Copilot ribbon
+   - Click the **Settings** button in the AI Assistant ribbon
    - Enter your DeepSeek API key
    - Adjust model/temperature/language preferences as needed
 
 ## Usage
 
 1. Open any OneNote page
-2. Click one of the Copilot commands in the ribbon:
+2. Click one of the Assistant commands in the ribbon:
    - **Summarize** — summarize the current page or section
    - **Q&A** — ask questions about the page content
    - **Generate** — create new content with an AI prompt
@@ -51,7 +51,7 @@ A Microsoft OneNote COM Add-in that integrates DeepSeek AI to provide an intelli
 ## Architecture
 
 ```
-OneNote Copilot Add-in
+OneNote AI Assistant Add-in
 ├── AddIn/              # COM add-in entry point & ribbon callbacks
 ├── AI/                 # DeepSeek API client, streaming, token estimation
 ├── Features/           # Command implementations (Summarize, Q&A, Generate, Rewrite, ExtractTodos)

@@ -8,6 +8,9 @@ obj/
 *.msi
 *.zip
 
+# Installer output
+Output/
+
 # NuGet packages
 packages/
 nuget.exe
