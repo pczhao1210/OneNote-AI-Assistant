@@ -1,0 +1,35 @@
+# Build artifacts
+bin/
+obj/
+*.exe
+*.dll
+*.pdb
+*.vs/
+*.msi
+*.zip
+
+# NuGet packages
+packages/
+nuget.exe
+
+# Test files
+tests/
+TestAddIn.cs
+TestAddIn.dll
+
+# Batch scripts
+register_test.bat
+enable_fusion_log.bat
+
+# IDE files
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+.vs/
+.idea/
+*.csproj.user
+
+# OS files
+Thumbs.db
+*.DS_Store
