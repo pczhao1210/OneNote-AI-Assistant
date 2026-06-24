@@ -35,6 +35,25 @@ namespace OneNoteAI.OneNote
                 DateModified = ParseDate((string)pageElement.Attribute("lastModifiedTime"))
             };
 
+            // Parse TagDef elements (tag definitions at page level)
+            foreach (XElement tagDefElement in pageElement.Elements(OneNs + "TagDef"))
+            {
+                int index;
+                int type;
+                int symbol;
+                int.TryParse((string)tagDefElement.Attribute("index") ?? "0", out index);
+                int.TryParse((string)tagDefElement.Attribute("type") ?? "0", out type);
+                int.TryParse((string)tagDefElement.Attribute("symbol") ?? "0", out symbol);
+
+                page.TagDefs.Add(new TagDef
+                {
+                    Index = index,
+                    Name = (string)tagDefElement.Attribute("name") ?? string.Empty,
+                    Type = type,
+                    Symbol = symbol
+                });
+            }
+
             foreach (XElement outlineElement in pageElement.Elements(OneNs + "Outline"))
             {
                 OutlineContent outline = new OutlineContent
@@ -49,7 +68,7 @@ namespace OneNoteAI.OneNote
                 {
                     foreach (XElement oeElement in childrenElement.Elements(OneNs + "OE"))
                     {
-                        ParseOeElement(oeElement, outline, 0);
+                        ParseOeElement(oeElement, outline, 0, page.TagDefs);
                     }
                 }
 
@@ -59,11 +78,41 @@ namespace OneNoteAI.OneNote
             return page;
         }
 
-        private static void ParseOeElement(XElement oeElement, OutlineContent outline, int indentLevel)
+        private static void ParseOeElement(XElement oeElement, OutlineContent outline, int indentLevel, System.Collections.Generic.List<TagDef> tagDefs)
         {
             if (oeElement == null)
             {
                 return;
+            }
+
+            // Parse Tag on this OE element
+            TagInfo tagInfo = null;
+            XElement tagElement = oeElement.Element(OneNs + "Tag");
+            if (tagElement != null)
+            {
+                int tagIndex;
+                int.TryParse((string)tagElement.Attribute("index") ?? "0", out tagIndex);
+                bool completed = string.Equals(
+                    (string)tagElement.Attribute("completed"), "true",
+                    StringComparison.OrdinalIgnoreCase);
+
+                // Look up tag name from TagDef
+                string tagName = string.Empty;
+                if (tagDefs != null)
+                {
+                    TagDef def = tagDefs.Find(d => d.Index == tagIndex);
+                    if (def != null)
+                    {
+                        tagName = def.Name;
+                    }
+                }
+
+                tagInfo = new TagInfo
+                {
+                    Index = tagIndex,
+                    Completed = completed,
+                    TagName = tagName
+                };
             }
 
             XElement textElement = oeElement.Element(OneNs + "T");
@@ -81,7 +130,8 @@ namespace OneNoteAI.OneNote
                             ?? string.Empty,
                         RawHtml = rawHtml,
                         Text = plainText,
-                        IndentLevel = indentLevel
+                        IndentLevel = indentLevel,
+                        Tag = tagInfo
                     });
                 }
             }
@@ -94,7 +144,7 @@ namespace OneNoteAI.OneNote
 
             foreach (XElement childOe in childrenElement.Elements(OneNs + "OE"))
             {
-                ParseOeElement(childOe, outline, indentLevel + 1);
+                ParseOeElement(childOe, outline, indentLevel + 1, tagDefs);
             }
         }
 

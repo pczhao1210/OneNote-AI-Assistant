@@ -75,10 +75,10 @@ namespace OneNoteAI.Features
 
         private static async Task RunSinglePageAsync(OneNoteProvider provider, string pageId)
         {
-            string content;
+            PageContent page;
             try
             {
-                content = provider.GetPage(pageId).GetPlainText();
+                page = provider.GetPage(pageId);
             }
             catch (Exception ex)
             {
@@ -87,15 +87,27 @@ namespace OneNoteAI.Features
                 return;
             }
 
+            string content = page.GetPlainText();
             if (string.IsNullOrWhiteSpace(content))
             {
                 Msg.Show("当前页面内容为空，无法提取待办事项。", "OneNote AI Assistant", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
+            // ── Step 1: Extract native OneNote tags (checkboxes) ──
+            List<TextBlock> taggedTodos = page.GetTaggedTodos();
+            string nativeSection = BuildNativeTagsSection(taggedTodos);
+
+            // ── Step 2: Get untagged text for AI analysis ──
+            string untaggedText = page.GetUntaggedText();
+
             AppSettings settings = SettingsManager.Current;
             string apiKey = SettingsManager.GetApiKey();
-            int tokens = TokenEstimator.Estimate(content);
+
+            // Build enhanced prompt that tells AI about already-tagged items
+            string aiPrompt = BuildSmartExtractPrompt(untaggedText, taggedTodos.Count > 0);
+
+            int tokens = TokenEstimator.Estimate(aiPrompt);
             string model = settings.AutoSelectModel
                 ? DeepseekClient.SelectModel("extract-todos", tokens)
                 : settings.DefaultModel;
@@ -109,13 +121,28 @@ namespace OneNoteAI.Features
                 {
                     using (DeepseekClient client = new DeepseekClient(apiKey, settings.ApiBaseUrl))
                     {
-                        localProgress.UpdateStatus("AI 正在提取待办");
-                        ChatRequest request = CreateRequest(
-                            settings, model,
-                            PromptTemplates.ExtractTodosSystem,
-                            PromptTemplates.BuildExtractTodosPrompt(content));
+                        // First show native tags section (if any)
+                        if (!string.IsNullOrWhiteSpace(nativeSection))
+                        {
+                            resultDialog.AppendText(nativeSection);
+                        }
 
-                        await StreamToDialogAsync(client, request, resultDialog, localProgress, localProgress.Token);
+                        // Then stream AI-discovered action items
+                        if (!string.IsNullOrWhiteSpace(untaggedText) && untaggedText.Length > 20)
+                        {
+                            localProgress.UpdateStatus("AI 正在分析潜在行动项...");
+                            ChatRequest request = CreateRequest(
+                                settings, model,
+                                PromptTemplates.ExtractTodosSystem,
+                                aiPrompt);
+
+                            await StreamToDialogAsync(client, request, resultDialog, localProgress, localProgress.Token);
+                        }
+                        else if (string.IsNullOrWhiteSpace(nativeSection))
+                        {
+                            resultDialog.AppendText("（未发现待办事项）");
+                        }
+
                         if (resultDialog != null && !resultDialog.IsDisposed) resultDialog.MarkStreamComplete();
                     }
                 }
@@ -393,6 +420,70 @@ namespace OneNoteAI.Features
                     Msg.Show(errorPrefix + ex.Message, "OneNote AI Assistant", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
             };
+        }
+
+        // ── Native tag extraction helpers ──
+
+        /// <summary>
+        /// Builds a formatted section showing OneNote native tagged items.
+        /// </summary>
+        private static string BuildNativeTagsSection(List<TextBlock> taggedTodos)
+        {
+            if (taggedTodos == null || taggedTodos.Count == 0)
+            {
+                return string.Empty;
+            }
+
+            System.Text.StringBuilder sb = new System.Text.StringBuilder();
+            sb.AppendLine("## 已有标记（OneNote 原生）\n");
+
+            int completedCount = 0;
+            int pendingCount = 0;
+
+            foreach (TextBlock block in taggedTodos)
+            {
+                if (block.Tag.Completed)
+                {
+                    sb.AppendFormat("✅ {0}\n", block.Text.Trim());
+                    completedCount++;
+                }
+                else
+                {
+                    sb.AppendFormat("☐ {0}\n", block.Text.Trim());
+                    pendingCount++;
+                }
+            }
+
+            sb.AppendFormat("\n**统计：** {0} 项未完成，{1} 项已完成\n\n", pendingCount, completedCount);
+            sb.AppendLine("---\n");
+
+            return sb.ToString();
+        }
+
+        /// <summary>
+        /// Builds a smart prompt that asks AI to find action items in untagged text,
+        /// without duplicating already-tagged items.
+        /// </summary>
+        private static string BuildSmartExtractPrompt(string untaggedText, bool hasNativeTags)
+        {
+            if (string.IsNullOrWhiteSpace(untaggedText))
+            {
+                return string.Empty;
+            }
+
+            string instruction = hasNativeTags
+                ? "以下是笔记中**未被标记**的文本内容。页面中已有一些 OneNote 原生待办标记（已在上方展示）。\n" +
+                  "请仅从以下未标记的文本中识别**隐含的行动项和待办事项**。\n" +
+                  "注意：不要重复上方已有的标记项。只提取新发现的潜在行动项。\n\n"
+                : "请从以下笔记内容中识别所有待办事项和行动项：\n\n";
+
+            string prefix = hasNativeTags
+                ? "## AI 发现的潜在行动项\n\n"
+                : "";
+
+            return instruction + untaggedText + "\n\n" +
+                   "如果发现了待办事项，请在输出开头加上：" + prefix +
+                   "如果未发现任何新的行动项，请输出：（未发现额外的待办事项）";
         }
     }
 }
