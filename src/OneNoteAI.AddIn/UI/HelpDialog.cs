@@ -34,12 +34,13 @@ namespace OneNoteAI.UI
             SplitContainer splitter = new SplitContainer
             {
                 Dock = DockStyle.Fill,
-                SplitterDistance = 220,
                 SplitterWidth = 4,
                 BackColor = Theme.BgCardBorder,
-                Panel1MinSize = 160,
-                Panel2MinSize = 350
+                Panel1MinSize = 140,
+                Panel2MinSize = 300
             };
+            // Set SplitterDistance after layout to avoid min-size conflicts
+            splitter.SplitterDistance = 200;
 
             // ── Left: Topic tree ──
             Panel treePanel = new Panel
