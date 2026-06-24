@@ -1,7 +1,7 @@
 [Setup]
 AppId={{67A7A8F4-62B1-449C-91E2-58257C4BFDAA}
 AppName=OneNote AI Assistant
-AppVersion=1.0.0
+AppVersion=2.0.0
 AppPublisher=OneNote AI Assistant
 DefaultDirName={autopf}\OneNoteAI
 DefaultGroupName=OneNote AI Assistant

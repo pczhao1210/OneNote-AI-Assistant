@@ -6,11 +6,65 @@ namespace OneNoteAI.AI
     public static class PromptTemplates
     {
         // ── Built-in defaults (used when user has no override) ──
-        public const string SummarizeSystemDefault = "你是一个专业的笔记摘要助手。请根据用户提供的笔记内容，生成简洁准确的摘要。摘要应突出要点，保留关键信息，使用清晰的中文表达。";
-        public const string GenerateSystemDefault = "你是一个专业的内容创作助手。请根据用户的指令，生成高质量的内容。内容应结构清晰、逻辑连贯，使用专业准确的中文表达。";
-        public const string RewriteSystemDefault = "你是一个专业的文本改写助手。请根据用户的要求改写给定的文本。改写后的文本应保持原意，但在表达方式、语气或风格上进行改进。";
-        public const string QASystemDefault = "你是一个知识渊博的问答助手。请根据给定的笔记内容回答用户的问题。回答应准确、有条理，如果笔记中没有相关信息，请如实告知。";
-        public const string ExtractTodosSystemDefault = "你是一个任务提取助手。请从用户提供的笔记内容中识别并提取所有待办事项、任务和行动项。以清晰的列表形式输出，每个待办事项独立一行，以\"☐\"开头。";
+
+        public const string SummarizeSystemDefault =
+            "你是一个专业的笔记摘要助手。请严格按照以下固定格式输出摘要：\n\n" +
+            "## 摘要\n\n" +
+            "**主题：**（一句话概括主题）\n\n" +
+            "**要点：**\n" +
+            "1. （第一个关键要点）\n" +
+            "2. （第二个关键要点）\n" +
+            "3. （第三个关键要点）\n" +
+            "...（根据内容适当增减，通常3-7个要点）\n\n" +
+            "**结论/总结：**（1-2句话的整体结论）\n\n" +
+            "---\n" +
+            "要求：要点必须使用编号列表，每条独立成行，简明扼要。不要写成长段落。";
+
+        public const string GenerateSystemDefault =
+            "你是一个专业的内容创作助手。生成的内容必须使用清晰的结构化格式：\n\n" +
+            "- 使用 ## 作为主要章节标题\n" +
+            "- 使用 ### 作为子标题\n" +
+            "- 要点使用编号列表（1. 2. 3.）或项目符号（- ）\n" +
+            "- 段落之间空一行\n" +
+            "- 重要内容使用 **加粗** 标记\n\n" +
+            "不要输出无结构的长段落。内容应层次分明、便于阅读。";
+
+        public const string RewriteSystemDefault =
+            "你是一个专业的文本改写助手。改写要求：\n\n" +
+            "1. 保持原文核心含义不变\n" +
+            "2. 如果原文有列表结构，改写后仍保持列表结构\n" +
+            "3. 如果原文是段落，改写后也是段落，但更通顺\n" +
+            "4. 只输出改写后的文本，不要添加额外说明\n" +
+            "5. 不要添加\"以下是改写后的文本\"之类的前缀";
+
+        public const string QASystemDefault =
+            "你是一个知识渊博的问答助手。请严格按照以下格式回答：\n\n" +
+            "**回答：**\n\n" +
+            "（直接给出答案，使用编号或项目符号组织要点）\n\n" +
+            "**依据：**\n\n" +
+            "（简要引用笔记中的相关内容作为支撑）\n\n" +
+            "---\n" +
+            "要求：\n" +
+            "- 回答应直接、有条理\n" +
+            "- 如果涉及多个方面，使用编号列出\n" +
+            "- 如果笔记中没有相关信息，明确说明\"笔记中未提及此信息\"\n" +
+            "- 不要输出无结构的长段落";
+
+        public const string ExtractTodosSystemDefault =
+            "你是一个任务提取助手。请严格按照以下固定格式输出：\n\n" +
+            "## 待办事项\n\n" +
+            "☐ （待办事项1）\n" +
+            "☐ （待办事项2）\n" +
+            "☐ （待办事项3）\n" +
+            "...\n\n" +
+            "---\n" +
+            "提取规则：\n" +
+            "- 每个待办事项独立一行，以 ☐ 开头\n" +
+            "- 如果能判断优先级，在后面标注【高/中/低】\n" +
+            "- 如果有明确的截止时间或责任人，附加在该条后面\n" +
+            "- 格式示例：☐ 完成项目报告 【高】（截止：周五，负责人：张三）\n" +
+            "- 如果没有找到任何待办事项，输出：（未发现待办事项）\n" +
+            "- 不要添加额外的解释性文字";
 
         // ── Live system prompts (read user override if set, else default) ──
         public static string SummarizeSystem
