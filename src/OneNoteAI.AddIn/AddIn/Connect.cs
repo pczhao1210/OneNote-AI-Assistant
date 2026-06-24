@@ -309,6 +309,16 @@ namespace OneNoteAI.AddIn
             UiThread.Post(TranslateCommand.Execute);
         }
 
+        public void OnTag(IRibbonControl control)
+        {
+            UiThread.Post(TagCommand.Execute);
+        }
+
+        public void OnTemplate(IRibbonControl control)
+        {
+            UiThread.Post(TemplateCommand.Execute);
+        }
+
         public void OnSettings(IRibbonControl control)
         {
             UiThread.Post(delegate
