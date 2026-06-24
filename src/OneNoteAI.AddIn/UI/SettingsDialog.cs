@@ -38,7 +38,7 @@ namespace OneNoteAI.UI
 
         public SettingsDialog()
         {
-            Text = "OneNote Copilot 设置";
+            Text = "OneNote AI Assistant 设置";
             ClientSize = new Size(560, 520);
             FormBorderStyle = FormBorderStyle.FixedDialog;
             StartPosition = FormStartPosition.CenterParent;
@@ -54,7 +54,7 @@ namespace OneNoteAI.UI
             };
 
             // ── Tab 1: API + Model ─────────────────────────────────────
-            TabPage tabApi = new TabPage("API 与模�?);
+            TabPage tabApi = new TabPage("API 与模型");
 
             GroupBox grpApi = new GroupBox
             {
@@ -144,7 +144,7 @@ namespace OneNoteAI.UI
                 Value = 0.7M
             };
 
-            Label lblMaxTokens = new Label { Text = "最�?Token �?", AutoSize = true, Location = new Point(220, 101) };
+            Label lblMaxTokens = new Label { Text = "最大 Token 数:", AutoSize = true, Location = new Point(220, 101) };
 
             _numMaxTokens = new NumericUpDown
             {
@@ -176,7 +176,7 @@ namespace OneNoteAI.UI
                 Location = new Point(10, 8),
                 Size = new Size(510, 32),
                 ForeColor = Color.FromArgb(90, 100, 115),
-                Text = "可为每个功能自定�?system prompt。留空则使用内置默认值。修改后立即生效（无需重启）�?
+                Text = "可为每个功能自定义 system prompt。留空则使用内置默认值。修改后立即生效（无需重启）。"
             };
 
             TabControl promptTabs = new TabControl
@@ -330,21 +330,21 @@ namespace OneNoteAI.UI
 
             if (string.IsNullOrWhiteSpace(apiBaseUrl))
             {
-                MessageBox.Show("请输�?API 地址�?, "OneNote Copilot", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show("请输入 API 地址。", "OneNote AI Assistant", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 _txtApiBaseUrl.Focus();
                 return;
             }
 
             if (!Uri.TryCreate(apiBaseUrl, UriKind.Absolute, out Uri _))
             {
-                MessageBox.Show("API 地址格式无效�?, "OneNote Copilot", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show("API 地址格式无效。", "OneNote AI Assistant", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 _txtApiBaseUrl.Focus();
                 return;
             }
 
             if (string.IsNullOrWhiteSpace(defaultModel))
             {
-                MessageBox.Show("请选择默认模型�?, "OneNote Copilot", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show("请选择默认模型。", "OneNote AI Assistant", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 _cmbDefaultModel.Focus();
                 return;
             }
@@ -388,14 +388,14 @@ namespace OneNoteAI.UI
 
             if (string.IsNullOrWhiteSpace(apiKey))
             {
-                MessageBox.Show("请先输入 API Key�?, "OneNote Copilot", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show("请先输入 API Key。", "OneNote AI Assistant", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 _txtApiKey.Focus();
                 return;
             }
 
             if (string.IsNullOrWhiteSpace(apiBaseUrl) || !Uri.TryCreate(apiBaseUrl, UriKind.Absolute, out Uri baseUri))
             {
-                MessageBox.Show("请输入有效的 API 地址�?, "OneNote Copilot", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show("请输入有效的 API 地址。", "OneNote AI Assistant", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 _txtApiBaseUrl.Focus();
                 return;
             }
@@ -434,13 +434,13 @@ namespace OneNoteAI.UI
 
                         if (response.IsSuccessStatusCode)
                         {
-                            MessageBox.Show("连接测试成功�?, "OneNote Copilot", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                            MessageBox.Show("连接测试成功。", "OneNote AI Assistant", MessageBoxButtons.OK, MessageBoxIcon.Information);
                         }
                         else
                         {
                             MessageBox.Show(
-                                "连接测试失败�? + response.StatusCode + Environment.NewLine + responseText,
-                                "OneNote Copilot",
+                                "连接测试失败：" + response.StatusCode + Environment.NewLine + responseText,
+                                "OneNote AI Assistant",
                                 MessageBoxButtons.OK,
                                 MessageBoxIcon.Error);
                         }
@@ -449,7 +449,7 @@ namespace OneNoteAI.UI
             }
             catch (Exception ex)
             {
-                MessageBox.Show("连接测试失败�? + ex.Message, "OneNote Copilot", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show("连接测试失败：" + ex.Message, "OneNote AI Assistant", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
             finally
             {

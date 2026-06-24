@@ -16,7 +16,7 @@ using OneNoteAI.UI;
 namespace OneNoteAI.Features
 {
     /// <summary>
-    /// Summarize command �?supports both single page (current page) and
+    /// Summarize command — supports both single page (current page) and
     /// section-wide (all pages in the current section) scopes. When the
     /// section scope is selected we run a map-reduce: each page is
     /// summarized individually, then the per-page summaries are fed back
@@ -28,7 +28,7 @@ namespace OneNoteAI.Features
         {
             if (!SettingsManager.HasApiKey())
             {
-                Msg.Show("请先在设置中配置 DeepSeek API Key�?, "OneNote Copilot", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                Msg.Show("请先在设置中配置 DeepSeek API Key。", "OneNote AI Assistant", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
@@ -48,7 +48,7 @@ namespace OneNoteAI.Features
             catch (Exception ex)
             {
                 Logger.Error("获取页面/分区信息失败", ex);
-                Msg.Show("获取页面/分区信息失败�? + ex.Message, "OneNote Copilot", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                Msg.Show("获取页面/分区信息失败：" + ex.Message, "OneNote AI Assistant", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return;
             }
 
@@ -84,13 +84,13 @@ namespace OneNoteAI.Features
             catch (Exception ex)
             {
                 Logger.Error("获取当前页面失败", ex);
-                Msg.Show("获取当前页面失败�? + ex.Message, "OneNote Copilot", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                Msg.Show("获取当前页面失败：" + ex.Message, "OneNote AI Assistant", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return;
             }
 
             if (string.IsNullOrWhiteSpace(content))
             {
-                Msg.Show("当前页面内容为空，无法生成摘要�?, "OneNote Copilot", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                Msg.Show("当前页面内容为空，无法生成摘要。", "OneNote AI Assistant", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
@@ -130,7 +130,7 @@ namespace OneNoteAI.Features
                 {
                     if (resultDialog != null && !resultDialog.IsDisposed && string.IsNullOrWhiteSpace(resultDialog.FullText))
                     {
-                        resultDialog.SetResult("操作已取消�?);
+                        resultDialog.SetResult("操作已取消。");
                     }
                     else if (resultDialog != null && !resultDialog.IsDisposed)
                     {
@@ -140,7 +140,7 @@ namespace OneNoteAI.Features
                 catch (Exception ex)
                 {
                     Logger.Error("摘要生成失败", ex);
-                    Msg.Show("摘要生成失败�? + ex.Message, "OneNote Copilot", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    Msg.Show("摘要生成失败：" + ex.Message, "OneNote AI Assistant", MessageBoxButtons.OK, MessageBoxIcon.Error);
                     if (resultDialog != null && !resultDialog.IsDisposed) resultDialog.MarkStreamComplete();
                 }
                 finally
@@ -152,7 +152,7 @@ namespace OneNoteAI.Features
             try
             {
                 resultDialog = new ResultDialog("摘要结果");
-                AttachInsertHandler(resultDialog, pageId, "AI 摘要", "插入摘要失败�?);
+                AttachInsertHandler(resultDialog, pageId, "AI 摘要", "插入摘要失败：");
                 resultDialog.OnRegenerate = delegate
                 {
                     resultDialog.ResetForRegenerate();
@@ -165,7 +165,7 @@ namespace OneNoteAI.Features
             catch (Exception ex)
             {
                 Logger.Error("摘要启动失败", ex);
-                Msg.Show("摘要生成失败�? + ex.Message, "OneNote Copilot", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                Msg.Show("摘要生成失败：" + ex.Message, "OneNote AI Assistant", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
@@ -179,7 +179,7 @@ namespace OneNoteAI.Features
         {
             if (sectionPages == null || sectionPages.Count == 0)
             {
-                Msg.Show("当前分区没有可处理的页面�?, "OneNote Copilot", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                Msg.Show("当前分区没有可处理的页面。", "OneNote AI Assistant", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
@@ -191,7 +191,7 @@ namespace OneNoteAI.Features
             {
                 progress = ProgressOverlay.Show(null);
                 resultDialog = new ResultDialog(string.Format("分区摘要 - {0}", string.IsNullOrWhiteSpace(sectionName) ? "当前分区" : sectionName));
-                AttachInsertHandler(resultDialog, currentPageId, "AI 分区摘要", "插入分区摘要失败�?);
+                AttachInsertHandler(resultDialog, currentPageId, "AI 分区摘要", "插入分区摘要失败：");
                 resultDialog.Show(UiThread.Anchor);
 
                 string apiKey = SettingsManager.GetApiKey();
@@ -204,7 +204,7 @@ namespace OneNoteAI.Features
                         progress.Token.ThrowIfCancellationRequested();
 
                         var entry = sectionPages[i];
-                        progress.UpdateStatus(string.Format("正在处理�?{0}/{1} 页：{2}", i + 1, sectionPages.Count, Truncate(entry.Title, 24)));
+                        progress.UpdateStatus(string.Format("正在处理第 {0}/{1} 页：{2}", i + 1, sectionPages.Count, Truncate(entry.Title, 24)));
 
                         string pageText;
                         try
@@ -244,12 +244,12 @@ namespace OneNoteAI.Features
 
                     if (partialSummaries.Count == 0)
                     {
-                        resultDialog.SetResult("分区内所有页面均为空，未生成摘要�?);
+                        resultDialog.SetResult("分区内所有页面均为空，未生成摘要。");
                         return;
                     }
 
                     // ── REDUCE: combine per-page summaries into a single overview ──
-                    progress.UpdateStatus("正在汇总整个分区摘�?);
+                    progress.UpdateStatus("正在汇总整个分区摘要");
                     string combined = string.Join("\n\n", partialSummaries);
                     string reducePrompt = PromptTemplates.BuildSummarizePrompt(combined, true);
                     int reduceTokens = TokenEstimator.Estimate(combined);
@@ -265,13 +265,13 @@ namespace OneNoteAI.Features
             {
                 if (resultDialog != null && !resultDialog.IsDisposed && string.IsNullOrWhiteSpace(resultDialog.FullText))
                 {
-                    resultDialog.SetResult("操作已取消�?);
+                    resultDialog.SetResult("操作已取消。");
                 }
             }
             catch (Exception ex)
             {
                 Logger.Error("分区摘要生成失败", ex);
-                Msg.Show("分区摘要生成失败�? + ex.Message, "OneNote Copilot", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                Msg.Show("分区摘要生成失败：" + ex.Message, "OneNote AI Assistant", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
             finally
             {
@@ -320,7 +320,7 @@ namespace OneNoteAI.Features
 
                 if (progress != null && !progress.IsDisposed)
                 {
-                    progress.UpdateStatus(string.Format("正在处理长页�?({0}/{1})", i + 1, chunks.Count));
+                    progress.UpdateStatus(string.Format("正在处理长页面 ({0}/{1})", i + 1, chunks.Count));
                 }
 
                 string chunk = chunks[i];
@@ -339,7 +339,7 @@ namespace OneNoteAI.Features
                 string summary = ExtractResponseText(chunkResponse);
                 if (!string.IsNullOrWhiteSpace(summary))
                 {
-                    partialSummaries.Add(string.Format("�?{0} 部分摘要：\n{1}", i + 1, summary.Trim()));
+                    partialSummaries.Add(string.Format("第 {0} 部分摘要：\n{1}", i + 1, summary.Trim()));
                 }
             }
 
@@ -412,8 +412,8 @@ namespace OneNoteAI.Features
                 }
                 catch (Exception ex)
                 {
-                    Logger.Error("插入摘要到页面失�?, ex);
-                    Msg.Show(errorPrefix + ex.Message, "OneNote Copilot", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    Logger.Error("插入摘要到页面失败", ex);
+                    Msg.Show(errorPrefix + ex.Message, "OneNote AI Assistant", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
             };
         }

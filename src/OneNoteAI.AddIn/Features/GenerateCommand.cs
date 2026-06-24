@@ -18,14 +18,14 @@ namespace OneNoteAI.Features
         {
             if (!SettingsManager.HasApiKey())
             {
-                Msg.Show("请先在设置中配置 DeepSeek API Key�?, "OneNote Copilot", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                Msg.Show("请先在设置中配置 DeepSeek API Key。", "OneNote AI Assistant", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
             string instruction;
             using (PromptDialog promptDialog = new PromptDialog(
                 "生成内容",
-                "请输入生成指令（例如：写一篇关于项目管理的总结�?,
+                "请输入生成指令（例如：写一篇关于项目管理的总结）",
                 "在此输入您的指令..."))
             {
                 if (promptDialog.ShowDialog(UiThread.Anchor) != DialogResult.OK)
@@ -38,7 +38,7 @@ namespace OneNoteAI.Features
 
             if (string.IsNullOrWhiteSpace(instruction))
             {
-                Msg.Show("请输入生成指令�?, "OneNote Copilot", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                Msg.Show("请输入生成指令。", "OneNote AI Assistant", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
@@ -55,7 +55,7 @@ namespace OneNoteAI.Features
             catch (Exception ex)
             {
                 Logger.Error("获取当前页面失败", ex);
-                Msg.Show("获取当前页面失败�? + ex.Message, "OneNote Copilot", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                Msg.Show("获取当前页面失败：" + ex.Message, "OneNote AI Assistant", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return;
             }
 
@@ -101,7 +101,7 @@ namespace OneNoteAI.Features
                 {
                     if (resultDialog != null && !resultDialog.IsDisposed && string.IsNullOrWhiteSpace(resultDialog.FullText))
                     {
-                        resultDialog.SetResult("操作已取消�?);
+                        resultDialog.SetResult("操作已取消。");
                     }
                     else if (resultDialog != null && !resultDialog.IsDisposed)
                     {
@@ -111,7 +111,7 @@ namespace OneNoteAI.Features
                 catch (Exception ex)
                 {
                     Logger.Error("生成内容失败", ex);
-                    Msg.Show("生成失败�? + ex.Message, "OneNote Copilot", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    Msg.Show("生成失败：" + ex.Message, "OneNote AI Assistant", MessageBoxButtons.OK, MessageBoxIcon.Error);
                     if (resultDialog != null && !resultDialog.IsDisposed) resultDialog.MarkStreamComplete();
                 }
                 finally
@@ -123,7 +123,7 @@ namespace OneNoteAI.Features
             try
             {
                 resultDialog = new ResultDialog("生成结果");
-                AttachInsertHandler(resultDialog, pageId, "AI 生成", "插入生成内容失败�?);
+                AttachInsertHandler(resultDialog, pageId, "AI 生成", "插入生成内容失败：");
                 resultDialog.OnRegenerate = delegate
                 {
                     resultDialog.ResetForRegenerate();
@@ -136,7 +136,7 @@ namespace OneNoteAI.Features
             catch (Exception ex)
             {
                 Logger.Error("生成启动失败", ex);
-                Msg.Show("生成失败�? + ex.Message, "OneNote Copilot", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                Msg.Show("生成失败：" + ex.Message, "OneNote AI Assistant", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
@@ -171,8 +171,8 @@ namespace OneNoteAI.Features
                 }
                 catch (Exception ex)
                 {
-                    Logger.Error("插入生成内容到页面失�?, ex);
-                    Msg.Show(errorPrefix + ex.Message, "OneNote Copilot", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    Logger.Error("插入生成内容到页面失败", ex);
+                    Msg.Show(errorPrefix + ex.Message, "OneNote AI Assistant", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
             };
         }

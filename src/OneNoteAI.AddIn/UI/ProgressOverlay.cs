@@ -16,11 +16,11 @@ namespace OneNoteAI.UI
         private readonly System.Windows.Forms.Timer _throughputTimer;
 
         private int _dotCount;
-        private string _baseStatus = "AI 正在思�?;
+        private string _baseStatus = "AI 正在思考";
 
         // Token throughput tracking. We approximate "tokens" by character
-        // count (deepseek tokenizer �?1 token / 1.5 char for English,
-        // 1 token / 1 char for Chinese �?close enough for a UX indicator).
+        // count (deepseek tokenizer ≈ 1 token / 1.5 char for English,
+        // 1 token / 1 char for Chinese — close enough for a UX indicator).
         private DateTime _streamStart;
         private long _totalChars;
         private bool _throughputStarted;
@@ -39,7 +39,7 @@ namespace OneNoteAI.UI
 
         public ProgressOverlay(Form owner = null)
         {
-            Text = "AI 正在思�?;
+            Text = "AI 正在思考";
             ClientSize = new Size(360, 130);
             FormBorderStyle = FormBorderStyle.FixedToolWindow;
             StartPosition = owner == null ? FormStartPosition.CenterScreen : FormStartPosition.CenterParent;
@@ -63,7 +63,7 @@ namespace OneNoteAI.UI
                 Size = new Size(320, 26),
                 Font = new Font("Microsoft YaHei UI", 11F, FontStyle.Bold, GraphicsUnit.Point),
                 ForeColor = Color.FromArgb(42, 52, 65),
-                Text = "AI 正在思�?.."
+                Text = "AI 正在思考..."
             };
 
             _lblThroughput = new Label
@@ -82,7 +82,7 @@ namespace OneNoteAI.UI
                 Location = new Point(20, 62),
                 Size = new Size(320, 18),
                 ForeColor = Color.FromArgb(110, 118, 130),
-                Text = "可随时点击下方按钮取�?
+                Text = "可随时点击下方按钮取消"
             };
 
             // Larger, accent-colored cancel button so users always notice it.
@@ -146,7 +146,7 @@ namespace OneNoteAI.UI
                 _dotCount = 1;
             }
 
-            string baseText = string.IsNullOrEmpty(_baseStatus) ? "AI 正在思�? : _baseStatus;
+            string baseText = string.IsNullOrEmpty(_baseStatus) ? "AI 正在思考" : _baseStatus;
             _lblStatus.Text = baseText + new string('.', _dotCount);
         }
 
@@ -164,7 +164,7 @@ namespace OneNoteAI.UI
             // Display as both chars/s and an approximate tokens/s so users
             // have an intuitive feel for how fast the stream is going.
             _lblThroughput.Text = string.Format(
-                "已接�?{0} �?· �?{1:F1} �?�?,
+                "已接收 {0} 字 · 约 {1:F1} 字/秒",
                 _totalChars, cps);
         }
 
@@ -188,7 +188,7 @@ namespace OneNoteAI.UI
         }
 
         /// <summary>
-        /// Updates the animated status text (e.g. "正在处理�?3/12 �?).
+        /// Updates the animated status text (e.g. "正在处理第 3/12 页").
         /// Safe to call from any thread.
         /// </summary>
         public void UpdateStatus(string text)
@@ -204,7 +204,7 @@ namespace OneNoteAI.UI
                 return;
             }
 
-            _baseStatus = string.IsNullOrWhiteSpace(text) ? "AI 正在思�? : text;
+            _baseStatus = string.IsNullOrWhiteSpace(text) ? "AI 正在思考" : text;
             _dotCount = 0;
             _lblStatus.Text = _baseStatus;
         }

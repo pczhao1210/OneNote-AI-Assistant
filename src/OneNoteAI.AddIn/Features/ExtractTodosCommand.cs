@@ -15,7 +15,7 @@ using OneNoteAI.UI;
 namespace OneNoteAI.Features
 {
     /// <summary>
-    /// Extract-todos command �?supports current page or full current section.
+    /// Extract-todos command — supports current page or full current section.
     /// For section scope we extract todos from each page individually and
     /// then concatenate them under per-page subheadings (no reduce step,
     /// since merging discrete todo lists by-page is more useful than
@@ -27,7 +27,7 @@ namespace OneNoteAI.Features
         {
             if (!SettingsManager.HasApiKey())
             {
-                Msg.Show("请先在设置中配置 DeepSeek API Key�?, "OneNote Copilot", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                Msg.Show("请先在设置中配置 DeepSeek API Key。", "OneNote AI Assistant", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
@@ -47,7 +47,7 @@ namespace OneNoteAI.Features
             catch (Exception ex)
             {
                 Logger.Error("获取页面/分区信息失败", ex);
-                Msg.Show("获取页面/分区信息失败�? + ex.Message, "OneNote Copilot", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                Msg.Show("获取页面/分区信息失败：" + ex.Message, "OneNote AI Assistant", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return;
             }
 
@@ -83,13 +83,13 @@ namespace OneNoteAI.Features
             catch (Exception ex)
             {
                 Logger.Error("获取当前页面失败", ex);
-                Msg.Show("获取当前页面失败�? + ex.Message, "OneNote Copilot", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                Msg.Show("获取当前页面失败：" + ex.Message, "OneNote AI Assistant", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return;
             }
 
             if (string.IsNullOrWhiteSpace(content))
             {
-                Msg.Show("当前页面内容为空，无法提取待办事项�?, "OneNote Copilot", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                Msg.Show("当前页面内容为空，无法提取待办事项。", "OneNote AI Assistant", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
@@ -123,7 +123,7 @@ namespace OneNoteAI.Features
                 {
                     if (resultDialog != null && !resultDialog.IsDisposed && string.IsNullOrWhiteSpace(resultDialog.FullText))
                     {
-                        resultDialog.SetResult("操作已取消�?);
+                        resultDialog.SetResult("操作已取消。");
                     }
                     else if (resultDialog != null && !resultDialog.IsDisposed)
                     {
@@ -133,7 +133,7 @@ namespace OneNoteAI.Features
                 catch (Exception ex)
                 {
                     Logger.Error("提取待办事项失败", ex);
-                    Msg.Show("提取待办事项失败�? + ex.Message, "OneNote Copilot", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    Msg.Show("提取待办事项失败：" + ex.Message, "OneNote AI Assistant", MessageBoxButtons.OK, MessageBoxIcon.Error);
                     if (resultDialog != null && !resultDialog.IsDisposed) resultDialog.MarkStreamComplete();
                 }
                 finally
@@ -145,7 +145,7 @@ namespace OneNoteAI.Features
             try
             {
                 resultDialog = new ResultDialog("待办提取结果");
-                AttachInsertHandler(resultDialog, pageId, "AI 提取待办", "插入待办事项失败�?);
+                AttachInsertHandler(resultDialog, pageId, "AI 提取待办", "插入待办事项失败：");
                 resultDialog.OnRegenerate = delegate
                 {
                     resultDialog.ResetForRegenerate();
@@ -158,7 +158,7 @@ namespace OneNoteAI.Features
             catch (Exception ex)
             {
                 Logger.Error("提取待办启动失败", ex);
-                Msg.Show("提取待办事项失败�? + ex.Message, "OneNote Copilot", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                Msg.Show("提取待办事项失败：" + ex.Message, "OneNote AI Assistant", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
@@ -172,7 +172,7 @@ namespace OneNoteAI.Features
         {
             if (sectionPages == null || sectionPages.Count == 0)
             {
-                Msg.Show("当前分区没有可处理的页面�?, "OneNote Copilot", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                Msg.Show("当前分区没有可处理的页面。", "OneNote AI Assistant", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
@@ -185,7 +185,7 @@ namespace OneNoteAI.Features
                 progress = ProgressOverlay.Show(null);
                 string title = string.Format("分区待办 - {0}", string.IsNullOrWhiteSpace(sectionName) ? "当前分区" : sectionName);
                 resultDialog = new ResultDialog(title);
-                AttachInsertHandler(resultDialog, currentPageId, "AI 分区待办", "插入待办事项失败�?);
+                AttachInsertHandler(resultDialog, currentPageId, "AI 分区待办", "插入待办事项失败：");
                 resultDialog.Show(UiThread.Anchor);
 
                 string apiKey = SettingsManager.GetApiKey();
@@ -197,7 +197,7 @@ namespace OneNoteAI.Features
                         progress.Token.ThrowIfCancellationRequested();
 
                         var entry = sectionPages[i];
-                        progress.UpdateStatus(string.Format("正在处理�?{0}/{1} 页：{2}", i + 1, sectionPages.Count, Truncate(entry.Title, 24)));
+                        progress.UpdateStatus(string.Format("正在处理第 {0}/{1} 页：{2}", i + 1, sectionPages.Count, Truncate(entry.Title, 24)));
 
                         string pageText;
                         try
@@ -254,7 +254,7 @@ namespace OneNoteAI.Features
 
                     if (!anyEmitted)
                     {
-                        resultDialog.SetResult("分区内未发现待办事项�?);
+                        resultDialog.SetResult("分区内未发现待办事项。");
                     }
                 }
             }
@@ -262,13 +262,13 @@ namespace OneNoteAI.Features
             {
                 if (resultDialog != null && !resultDialog.IsDisposed && string.IsNullOrWhiteSpace(resultDialog.FullText))
                 {
-                    resultDialog.SetResult("操作已取消�?);
+                    resultDialog.SetResult("操作已取消。");
                 }
             }
             catch (Exception ex)
             {
                 Logger.Error("分区待办提取失败", ex);
-                Msg.Show("分区待办提取失败�? + ex.Message, "OneNote Copilot", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                Msg.Show("分区待办提取失败：" + ex.Message, "OneNote AI Assistant", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
             finally
             {
@@ -291,7 +291,7 @@ namespace OneNoteAI.Features
                 cancellationToken.ThrowIfCancellationRequested();
                 if (progress != null && !progress.IsDisposed)
                 {
-                    progress.UpdateStatus(string.Format("正在处理长页�?({0}/{1})", i + 1, chunks.Count));
+                    progress.UpdateStatus(string.Format("正在处理长页面 ({0}/{1})", i + 1, chunks.Count));
                 }
 
                 int chunkTokens = TokenEstimator.Estimate(chunks[i]);
@@ -389,8 +389,8 @@ namespace OneNoteAI.Features
                 }
                 catch (Exception ex)
                 {
-                    Logger.Error("插入待办事项到页面失�?, ex);
-                    Msg.Show(errorPrefix + ex.Message, "OneNote Copilot", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    Logger.Error("插入待办事项到页面失败", ex);
+                    Msg.Show(errorPrefix + ex.Message, "OneNote AI Assistant", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
             };
         }

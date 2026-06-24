@@ -18,7 +18,7 @@ namespace OneNoteAI.Features
         {
             if (!SettingsManager.HasApiKey())
             {
-                Msg.Show("请先在设置中配置 DeepSeek API Key�?, "OneNote Copilot", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                Msg.Show("请先在设置中配置 DeepSeek API Key。", "OneNote AI Assistant", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
@@ -32,7 +32,9 @@ namespace OneNoteAI.Features
                 provider = new OneNoteProvider();
                 page = provider.GetCurrentPage();
 
-                // Prefer current selection —改写常常只针对一段文字�?                // 如果用户没选中任何东西就回退到整页�?                string selectionText = string.Empty;
+                // Prefer current selection —改写常常只针对一段文字。
+                // 如果用户没选中任何东西就回退到整页。
+                string selectionText = string.Empty;
                 try { selectionText = provider.GetCurrentSelectionText(); }
                 catch (Exception selEx) { Logger.Warn("读取选区失败，回退到整页：" + selEx.Message); }
 
@@ -50,18 +52,18 @@ namespace OneNoteAI.Features
             catch (Exception ex)
             {
                 Logger.Error("获取当前页面失败", ex);
-                Msg.Show("获取当前页面失败�? + ex.Message, "OneNote Copilot", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                Msg.Show("获取当前页面失败：" + ex.Message, "OneNote AI Assistant", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return;
             }
 
             if (string.IsNullOrWhiteSpace(content))
             {
-                Msg.Show("当前页面内容为空，无法改写�?, "OneNote Copilot", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                Msg.Show("当前页面内容为空，无法改写。", "OneNote AI Assistant", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
             string rewriteInstruction;
-            string promptTitle = isSelection ? "改写要求（已选中文本�? : "改写要求（整页）";
+            string promptTitle = isSelection ? "改写要求（已选中文本）" : "改写要求（整页）";
             using (PromptDialog promptDialog = new PromptDialog(promptTitle, "请输入改写要求（可选）", "例如：更正式、更简洁、更适合会议纪要"))
             {
                 if (promptDialog.ShowDialog(UiThread.Anchor) != DialogResult.OK)
@@ -117,7 +119,7 @@ namespace OneNoteAI.Features
                 {
                     if (resultDialog != null && !resultDialog.IsDisposed && string.IsNullOrWhiteSpace(resultDialog.FullText))
                     {
-                        resultDialog.SetResult("操作已取消�?);
+                        resultDialog.SetResult("操作已取消。");
                     }
                     else if (resultDialog != null && !resultDialog.IsDisposed)
                     {
@@ -127,7 +129,7 @@ namespace OneNoteAI.Features
                 catch (Exception ex)
                 {
                     Logger.Error("改写失败", ex);
-                    Msg.Show("改写失败�? + ex.Message, "OneNote Copilot", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    Msg.Show("改写失败：" + ex.Message, "OneNote AI Assistant", MessageBoxButtons.OK, MessageBoxIcon.Error);
                     if (resultDialog != null && !resultDialog.IsDisposed) resultDialog.MarkStreamComplete();
                 }
                 finally
@@ -138,9 +140,9 @@ namespace OneNoteAI.Features
 
             try
             {
-                string dialogTitle = isSelection ? "改写结果（针对选区�? : "改写结果（整页）";
+                string dialogTitle = isSelection ? "改写结果（针对选区）" : "改写结果（整页）";
                 resultDialog = new ResultDialog(dialogTitle);
-                AttachInsertHandler(resultDialog, pageId, "AI 改写", "插入改写结果失败�?);
+                AttachInsertHandler(resultDialog, pageId, "AI 改写", "插入改写结果失败：");
                 resultDialog.OnRegenerate = delegate
                 {
                     resultDialog.ResetForRegenerate();
@@ -154,7 +156,7 @@ namespace OneNoteAI.Features
             catch (Exception ex)
             {
                 Logger.Error("改写启动失败", ex);
-                Msg.Show("改写失败�? + ex.Message, "OneNote Copilot", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                Msg.Show("改写失败：" + ex.Message, "OneNote AI Assistant", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
             finally
             {
@@ -196,8 +198,8 @@ namespace OneNoteAI.Features
                 }
                 catch (Exception ex)
                 {
-                    Logger.Error("插入改写结果到页面失�?, ex);
-                    Msg.Show(errorPrefix + ex.Message, "OneNote Copilot", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    Logger.Error("插入改写结果到页面失败", ex);
+                    Msg.Show(errorPrefix + ex.Message, "OneNote AI Assistant", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
             };
         }

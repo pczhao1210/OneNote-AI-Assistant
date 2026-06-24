@@ -6,11 +6,11 @@ namespace OneNoteAI.AI
     public static class PromptTemplates
     {
         // ── Built-in defaults (used when user has no override) ──
-        public const string SummarizeSystemDefault = "你是一个专业的笔记摘要助手。请根据用户提供的笔记内容，生成简洁准确的摘要。摘要应突出要点，保留关键信息，使用清晰的中文表达�?;
-        public const string GenerateSystemDefault = "你是一个专业的内容创作助手。请根据用户的指令，生成高质量的内容。内容应结构清晰、逻辑连贯，使用专业准确的中文表达�?;
-        public const string RewriteSystemDefault = "你是一个专业的文本改写助手。请根据用户的要求改写给定的文本。改写后的文本应保持原意，但在表达方式、语气或风格上进行改进�?;
-        public const string QASystemDefault = "你是一个知识渊博的问答助手。请根据给定的笔记内容回答用户的问题。回答应准确、有条理，如果笔记中没有相关信息，请如实告知�?;
-        public const string ExtractTodosSystemDefault = "你是一个任务提取助手。请从用户提供的笔记内容中识别并提取所有待办事项、任务和行动项。以清晰的列表形式输出，每个待办事项独立一行，以\"☐\"开头�?;
+        public const string SummarizeSystemDefault = "你是一个专业的笔记摘要助手。请根据用户提供的笔记内容，生成简洁准确的摘要。摘要应突出要点，保留关键信息，使用清晰的中文表达。";
+        public const string GenerateSystemDefault = "你是一个专业的内容创作助手。请根据用户的指令，生成高质量的内容。内容应结构清晰、逻辑连贯，使用专业准确的中文表达。";
+        public const string RewriteSystemDefault = "你是一个专业的文本改写助手。请根据用户的要求改写给定的文本。改写后的文本应保持原意，但在表达方式、语气或风格上进行改进。";
+        public const string QASystemDefault = "你是一个知识渊博的问答助手。请根据给定的笔记内容回答用户的问题。回答应准确、有条理，如果笔记中没有相关信息，请如实告知。";
+        public const string ExtractTodosSystemDefault = "你是一个任务提取助手。请从用户提供的笔记内容中识别并提取所有待办事项、任务和行动项。以清晰的列表形式输出，每个待办事项独立一行，以\"☐\"开头。";
 
         // ── Live system prompts (read user override if set, else default) ──
         public static string SummarizeSystem
@@ -72,7 +72,7 @@ namespace OneNoteAI.AI
         {
             string instruction = string.IsNullOrWhiteSpace(rewriteInstruction)
                 ? "请改写以下文本，使其更加清晰、专业："
-                : string.Format("请按照以下要求改写文本：{0}\n\n原文�?, rewriteInstruction);
+                : string.Format("请按照以下要求改写文本：{0}\n\n原文：", rewriteInstruction);
 
             return string.Format("{0}\n\n{1}", instruction, originalText);
         }

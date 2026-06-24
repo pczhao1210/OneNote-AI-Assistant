@@ -8,7 +8,7 @@ namespace OneNoteAI.UI
 {
     public class ResultDialog : Form
     {
-        // Win32 �?used to suspend/resume painting of the RichTextBox while we
+        // Win32 — used to suspend/resume painting of the RichTextBox while we
         // rebuild its content during streaming. Without this every token causes
         // a full repaint + scrollbar flicker.
         private const int WM_SETREDRAW = 0x000B;
@@ -52,7 +52,7 @@ namespace OneNoteAI.UI
         /// Optional callback invoked when the user clicks "继续提问".
         /// Used by the QA command to support multi-turn dialogue. The handler
         /// should prompt for a follow-up question and stream the answer via
-        /// <see cref="AppendText"/> �?the dialog will NOT clear existing text,
+        /// <see cref="AppendText"/> — the dialog will NOT clear existing text,
         /// so the conversation accumulates. If null, the button stays hidden.
         /// </summary>
         public Action OnFollowUp { get; set; }
@@ -101,7 +101,7 @@ namespace OneNoteAI.UI
 
             _btnInsert = new Button
             {
-                Text = "插入到页�?,
+                Text = "插入到页面",
                 Size = new Size(110, 30),
                 Anchor = AnchorStyles.Right | AnchorStyles.Top
             };
@@ -350,7 +350,7 @@ namespace OneNoteAI.UI
             Match bulletMatch = Regex.Match(trimmed, "^[-•]\\s+(.*)$");
             if (bulletMatch.Success)
             {
-                AppendBulletPrefix("�?", true);
+                AppendBulletPrefix("• ", true);
                 AppendInlineFormattedText(bulletMatch.Groups[1].Value, new Font("Microsoft YaHei UI", 10F, FontStyle.Regular, GraphicsUnit.Point), Color.Black);
                 return;
             }
@@ -441,7 +441,7 @@ namespace OneNoteAI.UI
 
             // Disable until the new stream completes; the handler is expected
             // to call ResetForRegenerate(), then stream tokens, then either
-            // SetResult() or MarkStreamComplete() �?both re-enable the button.
+            // SetResult() or MarkStreamComplete() — both re-enable the button.
             _btnRegenerate.Enabled = false;
             _btnFollowUp.Enabled = false;
             try
@@ -450,7 +450,7 @@ namespace OneNoteAI.UI
             }
             catch (Exception ex)
             {
-                Msg.Show("重新生成失败�? + ex.Message, "OneNote Copilot", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                Msg.Show("重新生成失败：" + ex.Message, "OneNote AI Assistant", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 _btnRegenerate.Enabled = _streamComplete;
                 _btnFollowUp.Enabled = _streamComplete && OnFollowUp != null;
             }
@@ -469,7 +469,7 @@ namespace OneNoteAI.UI
             }
             catch (Exception ex)
             {
-                Msg.Show("追问失败�? + ex.Message, "OneNote Copilot", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                Msg.Show("追问失败：" + ex.Message, "OneNote AI Assistant", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 _btnRegenerate.Enabled = _streamComplete && OnRegenerate != null;
                 _btnFollowUp.Enabled = _streamComplete;
             }
@@ -488,7 +488,7 @@ namespace OneNoteAI.UI
             }
             catch (Exception ex)
             {
-                Msg.Show("复制失败�? + ex.Message, "OneNote Copilot", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                Msg.Show("复制失败：" + ex.Message, "OneNote AI Assistant", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
         }
 

@@ -40,7 +40,7 @@ namespace OneNoteAI.UI
                 Location = new Point(18, 16),
                 Size = new Size(380, 22),
                 Font = new Font("Microsoft YaHei UI", 10F, FontStyle.Bold, GraphicsUnit.Point),
-                Text = "请选择处理范围�?
+                Text = "请选择处理范围："
             };
 
             _rbPage = new RadioButton
@@ -48,7 +48,7 @@ namespace OneNoteAI.UI
                 AutoSize = false,
                 Location = new Point(24, 50),
                 Size = new Size(374, 24),
-                Text = "仅当前页�?,
+                Text = "仅当前页面",
                 Checked = defaultScope == ScopeKind.CurrentPage
             };
 
@@ -72,7 +72,7 @@ namespace OneNoteAI.UI
                 Location = new Point(24, 110),
                 Size = new Size(374, 36),
                 ForeColor = Color.FromArgb(110, 118, 130),
-                Text = "提示：分区范围会逐页处理后汇总，耗时与页数成正比�?
+                Text = "提示：分区范围会逐页处理后汇总，耗时与页数成正比。"
             };
 
             _btnOk = new Button
