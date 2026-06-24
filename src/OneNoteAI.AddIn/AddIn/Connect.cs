@@ -84,7 +84,7 @@ namespace OneNoteAI.AddIn
             }
             catch
             {
-                // Swallow â€?let the CLR try other resolution paths.
+                // Swallow ï¿½?let the CLR try other resolution paths.
             }
             return null;
         }
@@ -266,7 +266,7 @@ namespace OneNoteAI.AddIn
 
         /// <summary>
         /// Bridges System.Drawing.Image to stdole.IPictureDisp using the
-        /// hosted-control trick â€?AxHost.GetIPictureDispFromPicture is
+        /// hosted-control trick ï¿½?AxHost.GetIPictureDispFromPicture is
         /// protected, so we subclass to expose it.
         /// </summary>
         private sealed class PictureConverter : System.Windows.Forms.AxHost
@@ -302,6 +302,11 @@ namespace OneNoteAI.AddIn
         public void OnExtractTodos(IRibbonControl control)
         {
             UiThread.Post(ExtractTodosCommand.Execute);
+        }
+
+        public void OnTranslate(IRibbonControl control)
+        {
+            UiThread.Post(TranslateCommand.Execute);
         }
 
         public void OnSettings(IRibbonControl control)

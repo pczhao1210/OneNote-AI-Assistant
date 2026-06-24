@@ -1,6 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Text;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 using OneNoteAI.AI;
 using OneNoteAI.AI.Models;
@@ -14,79 +17,112 @@ namespace OneNoteAI.Features
 {
     public static class QACommand
     {
+        /// <summary>
+        /// System prompt for cross-page Q&A with citation support.
+        /// Instructs the AI to cite source page names in its answers.
+        /// </summary>
+        private const string CrossPageQASystem =
+            "你是一个知识渊博的问答助手。用户提供了多个笔记页面的内容，每个页面以【页面：标题】开头。" +
+            "请根据这些笔记内容回答用户的问题。回答要求：\n" +
+            "1. 回答应准确、有条理\n" +
+            "2. **必须在回答中标注信息来源**，格式为 [来源：页面标题]\n" +
+            "3. 如果答案涉及多个页面的信息，请分别标注\n" +
+            "4. 如果笔记中没有相关信息，请如实告知\n" +
+            "5. 优先使用与问题最相关的页面内容作答";
+
         public static async void Execute()
         {
             if (!SettingsManager.HasApiKey())
             {
-                Msg.Show("请先在设置中配置 DeepSeek API Key�?, "OneNote Copilot", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                Msg.Show("请先在设置中配置 DeepSeek API Key。", "OneNote AI Assistant", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
             OneNoteProvider provider;
-            PageContent page;
-            string noteContent;
+            PageContent currentPage;
+            string sectionName;
+            List<(string PageId, string Title)> sectionPages;
 
             try
             {
                 provider = new OneNoteProvider();
-                page = provider.GetCurrentPage();
-                noteContent = page.GetPlainText();
+                currentPage = provider.GetCurrentPage();
+                sectionName = provider.GetCurrentSectionName();
+                sectionPages = provider.GetSectionPages();
             }
             catch (Exception ex)
             {
-                Logger.Error("获取当前页面失败", ex);
-                Msg.Show("获取当前页面失败�? + ex.Message, "OneNote Copilot", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                Logger.Error("获取页面/分区信息失败", ex);
+                Msg.Show("获取页面/分区信息失败：" + ex.Message, "OneNote AI Assistant", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return;
             }
 
+            // Let user choose scope: current page or entire section
+            ScopeKind scope;
+            using (ScopeDialog scopeDialog = new ScopeDialog("智能问答 - 选择范围", sectionName, sectionPages.Count))
+            {
+                if (scopeDialog.ShowDialog(UiThread.Anchor) != DialogResult.OK)
+                {
+                    return;
+                }
+                scope = scopeDialog.SelectedScope;
+            }
+
+            if (scope == ScopeKind.CurrentPage)
+            {
+                await RunSinglePageQA(provider, currentPage);
+            }
+            else
+            {
+                await RunSectionQA(provider, currentPage, sectionName, sectionPages);
+            }
+        }
+
+        // ── Single page Q&A (original behavior) ─────────────────────────────
+
+        private static async Task RunSinglePageQA(OneNoteProvider provider, PageContent page)
+        {
+            string noteContent = page.GetPlainText();
+
             if (string.IsNullOrWhiteSpace(noteContent))
             {
-                Msg.Show("当前页面没有内容可供问答�?, "OneNote Copilot", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                Msg.Show("当前页面没有内容可供问答。", "OneNote AI Assistant", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
             string question;
             using (PromptDialog promptDialog = new PromptDialog(
                 "笔记问答",
-                "请输入您的问题（AI 将基于当前页面内容回答）",
+                "请输入您的问题（AI 将基于当前页面内容回答）：",
                 "在此输入您的问题..."))
             {
                 if (promptDialog.ShowDialog(UiThread.Anchor) != DialogResult.OK)
                 {
                     return;
                 }
-
                 question = promptDialog.UserInput;
             }
 
             if (string.IsNullOrWhiteSpace(question))
             {
-                Msg.Show("请输入您的问题�?, "OneNote Copilot", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
             string pageId = page.PageId;
             AppSettings settings = SettingsManager.Current;
-            ResultDialog resultDialog = null;
-
             string apiKey = SettingsManager.GetApiKey();
             string systemPrompt = PromptTemplates.QASystem;
 
-            // Conversation history. The system prompt + initial page-grounded
-            // user prompt are the first two messages; each follow-up appends a
-            // new user message and we capture the assistant reply at the end
-            // of each stream so the next turn sees the prior context.
             List<ChatMessage> history = new List<ChatMessage>
             {
                 ChatMessage.System(systemPrompt),
                 ChatMessage.User(PromptTemplates.BuildQAPrompt(noteContent, question))
             };
 
-            // Track where each round's tokens start in FullText so we can
-            // extract the assistant reply when the stream completes.
             int roundStartLength = 0;
+            ResultDialog resultDialog = null;
 
-            Func<System.Threading.Tasks.Task> runOnce = async delegate
+            Func<Task> runOnce = async delegate
             {
                 ProgressOverlay localProgress = ProgressOverlay.Show(null);
                 roundStartLength = resultDialog.FullText.Length;
@@ -114,7 +150,6 @@ namespace OneNoteAI.Features
                             delegate(string completed) { finalText = completed ?? string.Empty; },
                             localProgress.Token);
 
-                        // Persist assistant reply into history for next turn.
                         string assistantReply = !string.IsNullOrWhiteSpace(finalText)
                             ? finalText
                             : (resultDialog.FullText.Length > roundStartLength
@@ -139,7 +174,7 @@ namespace OneNoteAI.Features
                 {
                     if (resultDialog != null && !resultDialog.IsDisposed && string.IsNullOrWhiteSpace(resultDialog.FullText))
                     {
-                        resultDialog.SetResult("操作已取消�?);
+                        resultDialog.SetResult("操作已取消。");
                     }
                     else if (resultDialog != null && !resultDialog.IsDisposed)
                     {
@@ -149,7 +184,7 @@ namespace OneNoteAI.Features
                 catch (Exception ex)
                 {
                     Logger.Error("问答失败", ex);
-                    Msg.Show("问答失败�? + ex.Message, "OneNote Copilot", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    Msg.Show("问答失败：" + ex.Message, "OneNote AI Assistant", MessageBoxButtons.OK, MessageBoxIcon.Error);
                     if (resultDialog != null && !resultDialog.IsDisposed) resultDialog.MarkStreamComplete();
                 }
                 finally
@@ -161,18 +196,14 @@ namespace OneNoteAI.Features
             try
             {
                 resultDialog = new ResultDialog("问答（多轮）");
-                AttachInsertHandler(resultDialog, pageId, "AI 问答", "插入问答结果失败�?);
+                AttachInsertHandler(resultDialog, pageId, "AI 问答", "插入问答结果失败：");
 
                 resultDialog.OnRegenerate = delegate
                 {
-                    // Re-run the last user turn: drop the trailing assistant
-                    // reply (if any) and reset the dialog text to the state
-                    // before the last answer started streaming.
                     if (history.Count > 0 && history[history.Count - 1].Role == "assistant")
                     {
                         history.RemoveAt(history.Count - 1);
                     }
-                    // Truncate displayed text back to the prior round boundary.
                     string keep = resultDialog.FullText.Length > roundStartLength
                         ? resultDialog.FullText.Substring(0, roundStartLength)
                         : string.Empty;
@@ -186,7 +217,7 @@ namespace OneNoteAI.Features
                     string followUp;
                     using (PromptDialog dlg = new PromptDialog(
                         "继续提问",
-                        "请输入追问（AI 将基于之前的对话回答�?,
+                        "请输入追问（AI 将基于之前的对话回答）：",
                         "在此输入您的追问..."))
                     {
                         if (dlg.ShowDialog(UiThread.Anchor) != DialogResult.OK) return;
@@ -195,7 +226,6 @@ namespace OneNoteAI.Features
                     if (string.IsNullOrWhiteSpace(followUp)) return;
 
                     history.Add(ChatMessage.User(followUp));
-                    // Append a visual separator before streaming the new answer.
                     resultDialog.AppendText("\n\n---\n\n**问：** " + followUp.Trim() + "\n\n**答：** ");
                     _ = runOnce();
                 };
@@ -206,23 +236,272 @@ namespace OneNoteAI.Features
             catch (Exception ex)
             {
                 Logger.Error("问答启动失败", ex);
-                Msg.Show("问答失败�? + ex.Message, "OneNote Copilot", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                Msg.Show("问答失败：" + ex.Message, "OneNote AI Assistant", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
-        private static ChatRequest CreateRequest(AppSettings settings, string model, string systemPrompt, string userPrompt)
+        // ── Section-wide Q&A with citation ───────────────────────────────────
+
+        private static async Task RunSectionQA(
+            OneNoteProvider provider,
+            PageContent currentPage,
+            string sectionName,
+            List<(string PageId, string Title)> sectionPages)
         {
-            return new ChatRequest
+            if (sectionPages == null || sectionPages.Count == 0)
             {
-                Model = model,
-                Temperature = settings.Temperature,
-                MaxTokens = settings.MaxTokens,
-                Messages = new List<ChatMessage>
+                Msg.Show("当前分区没有可处理的页面。", "OneNote AI Assistant", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            // Ask the question first
+            string question;
+            using (PromptDialog promptDialog = new PromptDialog(
+                "跨页问答",
+                string.Format("AI 将搜索分区「{0}」中的 {1} 个页面来回答您的问题。\n回答将标注信息来源页面。",
+                    string.IsNullOrWhiteSpace(sectionName) ? "当前分区" : sectionName,
+                    sectionPages.Count),
+                "在此输入您的问题..."))
+            {
+                if (promptDialog.ShowDialog(UiThread.Anchor) != DialogResult.OK)
                 {
-                    ChatMessage.System(systemPrompt),
-                    ChatMessage.User(userPrompt)
+                    return;
                 }
-            };
+                question = promptDialog.UserInput;
+            }
+
+            if (string.IsNullOrWhiteSpace(question))
+            {
+                return;
+            }
+
+            AppSettings settings = SettingsManager.Current;
+            string apiKey = SettingsManager.GetApiKey();
+            ProgressOverlay progress = null;
+            ResultDialog resultDialog = null;
+
+            try
+            {
+                progress = ProgressOverlay.Show(null);
+
+                // ── Gather all page content with titles ──
+                progress.UpdateStatus("正在读取分区页面...");
+                StringBuilder contextBuilder = new StringBuilder();
+                int loadedPages = 0;
+
+                for (int i = 0; i < sectionPages.Count; i++)
+                {
+                    progress.Token.ThrowIfCancellationRequested();
+                    var entry = sectionPages[i];
+                    progress.UpdateStatus(string.Format("读取页面 {0}/{1}：{2}",
+                        i + 1, sectionPages.Count, Truncate(entry.Title, 20)));
+
+                    string pageText;
+                    try
+                    {
+                        pageText = provider.GetPage(entry.PageId).GetPlainText();
+                    }
+                    catch (Exception readEx)
+                    {
+                        Logger.Error("读取页面失败: " + entry.Title, readEx);
+                        continue;
+                    }
+
+                    if (string.IsNullOrWhiteSpace(pageText))
+                    {
+                        continue;
+                    }
+
+                    // Truncate very long pages to fit within token limits
+                    string truncatedText = TruncateContent(pageText, 2000);
+                    contextBuilder.AppendFormat("\n\n【页面：{0}】\n{1}", entry.Title, truncatedText);
+                    loadedPages++;
+                }
+
+                if (loadedPages == 0)
+                {
+                    if (progress != null && !progress.IsDisposed) progress.Close();
+                    Msg.Show("分区内所有页面均为空。", "OneNote AI Assistant", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                string allContent = contextBuilder.ToString();
+
+                // ── Build conversation with citation-aware system prompt ──
+                List<ChatMessage> history = new List<ChatMessage>
+                {
+                    ChatMessage.System(CrossPageQASystem),
+                    ChatMessage.User(string.Format(
+                        "以下是分区「{0}」中 {1} 个页面的笔记内容：\n{2}\n\n---\n\n我的问题是：{3}",
+                        sectionName, loadedPages, allContent, question))
+                };
+
+                int roundStartLength = 0;
+
+                // Close progress before showing result dialog
+                if (progress != null && !progress.IsDisposed) progress.Close();
+                progress = null;
+
+                resultDialog = new ResultDialog(string.Format("跨页问答 - {0}（{1}页）",
+                    string.IsNullOrWhiteSpace(sectionName) ? "当前分区" : sectionName, loadedPages));
+                AttachInsertHandler(resultDialog, currentPage.PageId, "AI 跨页问答", "插入问答结果失败：");
+
+                Func<Task> runOnce = async delegate
+                {
+                    ProgressOverlay localProgress = ProgressOverlay.Show(null);
+                    roundStartLength = resultDialog.FullText.Length;
+                    try
+                    {
+                        int tokens = TokenEstimator.Estimate(string.Join("\n", history.ConvertAll(m => m.Content)));
+                        string model = settings.AutoSelectModel
+                            ? DeepseekClient.SelectModel("qa", tokens)
+                            : settings.DefaultModel;
+
+                        localProgress.UpdateStatus("AI 正在分析并回答...");
+
+                        using (DeepseekClient client = new DeepseekClient(apiKey, settings.ApiBaseUrl))
+                        {
+                            ChatRequest request = new ChatRequest
+                            {
+                                Model = model,
+                                Temperature = settings.Temperature,
+                                MaxTokens = settings.MaxTokens,
+                                Messages = new List<ChatMessage>(history)
+                            };
+                            string finalText = string.Empty;
+
+                            await client.StreamAsync(
+                                request,
+                                delegate(string token) { localProgress.ReportTokens(token == null ? 0 : token.Length); resultDialog.AppendText(token); },
+                                delegate(string completed) { finalText = completed ?? string.Empty; },
+                                localProgress.Token);
+
+                            string assistantReply = !string.IsNullOrWhiteSpace(finalText)
+                                ? finalText
+                                : (resultDialog.FullText.Length > roundStartLength
+                                    ? resultDialog.FullText.Substring(roundStartLength)
+                                    : string.Empty);
+                            if (!string.IsNullOrWhiteSpace(assistantReply))
+                            {
+                                history.Add(ChatMessage.Assistant(assistantReply));
+                            }
+
+                            if (string.IsNullOrWhiteSpace(resultDialog.FullText) && !string.IsNullOrWhiteSpace(finalText))
+                            {
+                                resultDialog.SetResult(finalText);
+                            }
+                            else
+                            {
+                                resultDialog.MarkStreamComplete();
+                            }
+                        }
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        if (resultDialog != null && !resultDialog.IsDisposed && string.IsNullOrWhiteSpace(resultDialog.FullText))
+                        {
+                            resultDialog.SetResult("操作已取消。");
+                        }
+                        else if (resultDialog != null && !resultDialog.IsDisposed)
+                        {
+                            resultDialog.MarkStreamComplete();
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Error("跨页问答失败", ex);
+                        Msg.Show("跨页问答失败：" + ex.Message, "OneNote AI Assistant", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        if (resultDialog != null && !resultDialog.IsDisposed) resultDialog.MarkStreamComplete();
+                    }
+                    finally
+                    {
+                        if (localProgress != null && !localProgress.IsDisposed) localProgress.Close();
+                    }
+                };
+
+                resultDialog.OnRegenerate = delegate
+                {
+                    if (history.Count > 0 && history[history.Count - 1].Role == "assistant")
+                    {
+                        history.RemoveAt(history.Count - 1);
+                    }
+                    string keep = resultDialog.FullText.Length > roundStartLength
+                        ? resultDialog.FullText.Substring(0, roundStartLength)
+                        : string.Empty;
+                    resultDialog.ResetForRegenerate();
+                    if (!string.IsNullOrEmpty(keep)) resultDialog.AppendText(keep);
+                    _ = runOnce();
+                };
+
+                resultDialog.OnFollowUp = delegate
+                {
+                    string followUp;
+                    using (PromptDialog dlg = new PromptDialog(
+                        "继续提问",
+                        "请输入追问（AI 将基于分区内容和之前的对话回答）：",
+                        "在此输入您的追问..."))
+                    {
+                        if (dlg.ShowDialog(UiThread.Anchor) != DialogResult.OK) return;
+                        followUp = dlg.UserInput;
+                    }
+                    if (string.IsNullOrWhiteSpace(followUp)) return;
+
+                    history.Add(ChatMessage.User(followUp));
+                    resultDialog.AppendText("\n\n---\n\n**问：** " + followUp.Trim() + "\n\n**答：** ");
+                    _ = runOnce();
+                };
+
+                resultDialog.Show(UiThread.Anchor);
+                await runOnce();
+            }
+            catch (OperationCanceledException)
+            {
+                if (resultDialog != null && !resultDialog.IsDisposed && string.IsNullOrWhiteSpace(resultDialog.FullText))
+                {
+                    resultDialog.SetResult("操作已取消。");
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("跨页问答启动失败", ex);
+                Msg.Show("跨页问答失败：" + ex.Message, "OneNote AI Assistant", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            finally
+            {
+                if (progress != null && !progress.IsDisposed) progress.Close();
+            }
+        }
+
+        // ── Helpers ──────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Truncates content to approximately maxChars characters, cutting at
+        /// paragraph boundaries to keep content coherent.
+        /// </summary>
+        private static string TruncateContent(string text, int maxChars)
+        {
+            if (string.IsNullOrEmpty(text) || text.Length <= maxChars)
+            {
+                return text ?? string.Empty;
+            }
+
+            // Try to cut at a paragraph boundary
+            int cutPoint = text.LastIndexOf('\n', maxChars);
+            if (cutPoint < maxChars / 2)
+            {
+                cutPoint = maxChars;
+            }
+
+            return text.Substring(0, cutPoint) + "\n...(内容已截断)";
+        }
+
+        private static string Truncate(string text, int max)
+        {
+            if (string.IsNullOrEmpty(text) || text.Length <= max)
+            {
+                return text ?? string.Empty;
+            }
+            return text.Substring(0, max) + "...";
         }
 
         private static void AttachInsertHandler(ResultDialog resultDialog, string pageId, string heading, string errorPrefix)
@@ -241,8 +520,8 @@ namespace OneNoteAI.Features
                 }
                 catch (Exception ex)
                 {
-                    Logger.Error("插入问答结果到页面失�?, ex);
-                    Msg.Show(errorPrefix + ex.Message, "OneNote Copilot", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    Logger.Error("插入问答结果到页面失败", ex);
+                    Msg.Show(errorPrefix + ex.Message, "OneNote AI Assistant", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
             };
         }

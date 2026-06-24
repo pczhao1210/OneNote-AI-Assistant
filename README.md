@@ -7,9 +7,10 @@ A Microsoft OneNote COM Add-in that integrates DeepSeek AI to provide an intelli
 | Feature | Description |
 |---------|-------------|
 | **Summarize** | Generate AI summaries of the current page or an entire section. Supports map-reduce for long content. Results can be inserted back into the page. |
-| **Q&A** | Multi-turn question-answering grounded in your page content. Maintains conversation history for follow-up questions. |
+| **Q&A** | Multi-turn question-answering. Supports **cross-page search** across the entire section with **citation** (marks which page each answer comes from). |
 | **Generate** | Create new content from natural language instructions, optionally referencing existing page content as context. |
 | **Rewrite** | Rewrite selected text or entire pages according to your instructions (e.g., "more formal", "more concise"). |
+| **Translate** | Translate selected text or full page to any target language. Supports auto-detection and 8+ languages. |
 | **Extract Todos** | Extract action items and to-do items from pages or entire sections. |
 
 ## Prerequisites
@@ -41,9 +42,10 @@ A Microsoft OneNote COM Add-in that integrates DeepSeek AI to provide an intelli
 1. Open any OneNote page
 2. Click one of the Assistant commands in the ribbon:
    - **Summarize** — summarize the current page or section
-   - **Q&A** — ask questions about the page content
+   - **Q&A** — ask questions (single page or cross-section with source citations)
    - **Generate** — create new content with an AI prompt
    - **Rewrite** — rewrite selected text or the whole page
+   - **Translate** — translate selected text or full page
    - **Extract Todos** — extract action items from notes
 3. Review the AI response in the streaming dialog
 4. Click **Insert** to add the result to your page, or **Regenerate** for a new response
@@ -54,7 +56,7 @@ A Microsoft OneNote COM Add-in that integrates DeepSeek AI to provide an intelli
 OneNote AI Assistant Add-in
 ├── AddIn/              # COM add-in entry point & ribbon callbacks
 ├── AI/                 # DeepSeek API client, streaming, token estimation
-├── Features/           # Command implementations (Summarize, Q&A, Generate, Rewrite, ExtractTodos)
+├── Features/           # Command implementations (Summarize, Q&A, Generate, Rewrite, Translate, ExtractTodos)
 ├── OneNote/            # OneNote COM interop, page parsing & writing
 ├── UI/                 # Windows Forms dialogs (ResultDialog, Settings, etc.)
 ├── Settings/           # Encrypted settings management (DPAPI)

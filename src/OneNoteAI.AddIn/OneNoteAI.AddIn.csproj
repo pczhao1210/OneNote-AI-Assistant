@@ -108,6 +108,7 @@
     <Compile Include="Features\RewriteCommand.cs" />
     <Compile Include="Features\QACommand.cs" />
     <Compile Include="Features\ExtractTodosCommand.cs" />
+    <Compile Include="Features\TranslateCommand.cs" />
     <Compile Include="Logging\Logger.cs" />
     <EmbeddedResource Include="Ribbon\CustomUI.xml" />
     <EmbeddedResource Include="Ribbon\Icons\Summarize.png" />
