@@ -456,7 +456,13 @@ AI 自动分析页面内容，生成标签和分类。
 
 版本：2.0.0
 
-一款集成 AI 能力的 OneNote 智能助手插件，帮助您更高效地管理和创作笔记。
+## 开发背景
+
+本插件由 OneNote MVP 开发。
+
+由于部分地区无法使用 Microsoft 官方的 OneNote Copilot 功能，许多用户在日常笔记工作中无法享受到 AI 带来的效率提升。为了解决这一问题，我们开发了 OneNote AI Assistant —— 一款完全独立的 AI 智能助手插件，让全球所有 OneNote 用户都能在笔记中使用 AI 能力。
+
+本插件不依赖 Microsoft Copilot 服务，通过接入 DeepSeek、OpenAI、Ollama 等第三方 AI 服务（包括本地部署方案），为用户提供灵活、可控、无地域限制的 AI 笔记体验。
 
 ## 主要功能
 - 智能摘要、内容生成、模板创作
@@ -469,7 +475,11 @@ AI 自动分析页面内容，生成标签和分类。
 - C# / .NET Framework 4.8
 - COM Add-in (IDTExtensibility2)
 - OneNote Interop API
-- OpenAI-compatible Chat API";
+- OpenAI-compatible Chat API
+
+## 联系方式
+- GitHub：github.com/oldding/OneNote-AI-Assistant
+- 开发者：OneNote_MVP";
 
                 default: return "请从左侧目录选择一个主题。";
             }
