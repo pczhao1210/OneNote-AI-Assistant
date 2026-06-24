@@ -60,14 +60,15 @@ namespace OneNoteAI.UI
         public ResultDialog(string title)
         {
             Text = string.IsNullOrWhiteSpace(title) ? "AI 结果" : title;
-            ClientSize = new Size(680, 560);
+            ClientSize = new Size(700, 580);
             MinimumSize = new Size(560, 420);
             StartPosition = FormStartPosition.CenterScreen;
             FormBorderStyle = FormBorderStyle.Sizable;
             ShowInTaskbar = true;
             TopMost = true;
-            BackColor = Color.FromArgb(245, 247, 250);
+            BackColor = Color.FromArgb(248, 249, 252);
             Font = new Font("Microsoft YaHei UI", 9F, FontStyle.Regular, GraphicsUnit.Point);
+            DoubleBuffered = true;
 
             Shown += delegate
             {
@@ -82,32 +83,59 @@ namespace OneNoteAI.UI
                 }
             };
 
-            // ── Header panel (brand bar) ──
+            // ── OneNote-style color accent (left stripe) ──
+            Panel accentStripe = new Panel
+            {
+                Dock = DockStyle.Left,
+                Width = 5,
+                BackColor = Color.FromArgb(128, 57, 123) // OneNote purple
+            };
+
+            // ── Header panel (gradient-feel) ──
             Panel headerPanel = new Panel
             {
                 Dock = DockStyle.Top,
-                Height = 44,
-                BackColor = Color.FromArgb(37, 99, 235), // Modern blue
-                Padding = new Padding(16, 0, 16, 0)
+                Height = 52
+            };
+            headerPanel.Paint += delegate(object s, PaintEventArgs pe)
+            {
+                using (System.Drawing.Drawing2D.LinearGradientBrush brush =
+                    new System.Drawing.Drawing2D.LinearGradientBrush(
+                        headerPanel.ClientRectangle,
+                        Color.FromArgb(128, 57, 123),  // OneNote purple
+                        Color.FromArgb(149, 97, 166),  // lighter purple
+                        System.Drawing.Drawing2D.LinearGradientMode.Horizontal))
+                {
+                    pe.Graphics.FillRectangle(brush, headerPanel.ClientRectangle);
+                }
             };
 
             Label headerLabel = new Label
             {
-                Text = "✦  " + (string.IsNullOrWhiteSpace(title) ? "AI 结果" : title),
+                Text = "  ✦  " + (string.IsNullOrWhiteSpace(title) ? "AI 结果" : title),
                 ForeColor = Color.White,
-                Font = new Font("Microsoft YaHei UI", 11F, FontStyle.Bold, GraphicsUnit.Point),
+                Font = new Font("Microsoft YaHei UI", 12F, FontStyle.Bold, GraphicsUnit.Point),
                 AutoSize = false,
                 Dock = DockStyle.Fill,
-                TextAlign = ContentAlignment.MiddleLeft
+                TextAlign = ContentAlignment.MiddleLeft,
+                BackColor = Color.Transparent
             };
             headerPanel.Controls.Add(headerLabel);
 
-            // ── Content area ──
-            Panel contentPanel = new Panel
+            // ── Content area (card-like with subtle shadow) ──
+            Panel contentWrapper = new Panel
             {
                 Dock = DockStyle.Fill,
-                Padding = new Padding(16, 12, 16, 12),
-                BackColor = Color.FromArgb(245, 247, 250)
+                Padding = new Padding(20, 16, 20, 12),
+                BackColor = Color.FromArgb(248, 249, 252)
+            };
+
+            // Inner card panel with border
+            Panel contentCard = new Panel
+            {
+                Dock = DockStyle.Fill,
+                Padding = new Padding(1),
+                BackColor = Color.FromArgb(224, 224, 230) // subtle border color
             };
 
             _rtbResult = new RichTextBox
@@ -119,46 +147,46 @@ namespace OneNoteAI.UI
                 HideSelection = true,
                 DetectUrls = true,
                 Font = new Font("Microsoft YaHei UI", 10.5F, FontStyle.Regular, GraphicsUnit.Point),
-                Margin = new Padding(0),
                 ScrollBars = RichTextBoxScrollBars.Vertical
             };
-            contentPanel.Controls.Add(_rtbResult);
+            contentCard.Controls.Add(_rtbResult);
+            contentWrapper.Controls.Add(contentCard);
 
-            // ── Button panel (modern action bar) ──
+            // ── Button panel (OneNote-style action bar) ──
             _buttonPanel = new Panel
             {
                 Dock = DockStyle.Bottom,
-                Height = 62,
-                BackColor = Color.White,
-                Padding = new Padding(16, 12, 16, 12)
+                Height = 64,
+                BackColor = Color.FromArgb(248, 249, 252),
+                Padding = new Padding(20, 12, 20, 12)
             };
 
-            // Paint a top border line on button panel
+            // Top border line
             _buttonPanel.Paint += delegate(object s, PaintEventArgs pe)
             {
-                using (Pen pen = new Pen(Color.FromArgb(226, 232, 240)))
+                using (Pen pen = new Pen(Color.FromArgb(214, 211, 219)))
                 {
-                    pe.Graphics.DrawLine(pen, 0, 0, _buttonPanel.Width, 0);
+                    pe.Graphics.DrawLine(pen, 16, 0, _buttonPanel.Width - 16, 0);
                 }
             };
 
-            _btnRegenerate = CreateModernButton("↻ 重新生成", Color.FromArgb(100, 116, 139), Color.FromArgb(241, 245, 249));
+            _btnRegenerate = CreateStyledButton("↻ 重新生成", Color.FromArgb(100, 100, 115), Color.FromArgb(240, 238, 245), Color.FromArgb(200, 190, 210));
             _btnRegenerate.Visible = false;
             _btnRegenerate.Enabled = false;
             _btnRegenerate.Click += OnRegenerateClick;
 
-            _btnFollowUp = CreateModernButton("💬 继续提问", Color.FromArgb(100, 116, 139), Color.FromArgb(241, 245, 249));
+            _btnFollowUp = CreateStyledButton("💬 继续提问", Color.FromArgb(100, 100, 115), Color.FromArgb(240, 238, 245), Color.FromArgb(200, 190, 210));
             _btnFollowUp.Visible = false;
             _btnFollowUp.Enabled = false;
             _btnFollowUp.Click += OnFollowUpClick;
 
-            _btnInsert = CreateModernButton("📥 插入页面", Color.White, Color.FromArgb(37, 99, 235));
+            _btnInsert = CreateStyledButton("📥 插入页面", Color.White, Color.FromArgb(128, 57, 123), Color.FromArgb(149, 97, 166));
             _btnInsert.Click += OnInsertClick;
 
-            _btnCopy = CreateModernButton("📋 复制", Color.FromArgb(55, 65, 81), Color.FromArgb(243, 244, 246));
+            _btnCopy = CreateStyledButton("📋 复制", Color.FromArgb(80, 70, 90), Color.FromArgb(243, 241, 248), Color.FromArgb(224, 218, 235));
             _btnCopy.Click += OnCopyClick;
 
-            _btnClose = CreateModernButton("关闭", Color.FromArgb(107, 114, 128), Color.Transparent);
+            _btnClose = CreateStyledButton("关闭", Color.FromArgb(130, 125, 140), Color.Transparent, Color.FromArgb(240, 238, 245));
             _btnClose.FlatAppearance.BorderSize = 0;
             _btnClose.DialogResult = DialogResult.Cancel;
             _btnClose.Click += delegate { Close(); };
@@ -169,10 +197,11 @@ namespace OneNoteAI.UI
             _buttonPanel.Controls.Add(_btnFollowUp);
             _buttonPanel.Controls.Add(_btnClose);
 
-            // Add panels in correct order (header on top, buttons on bottom, content fills)
-            Controls.Add(contentPanel);
+            // Add panels in correct z-order
+            Controls.Add(contentWrapper);
             Controls.Add(_buttonPanel);
             Controls.Add(headerPanel);
+            Controls.Add(accentStripe);
 
             CancelButton = _btnClose;
 
@@ -190,13 +219,13 @@ namespace OneNoteAI.UI
             };
         }
 
-        /// <summary>Creates a modern flat button with rounded feel.</summary>
-        private static Button CreateModernButton(string text, Color foreColor, Color backColor)
+        /// <summary>Creates a OneNote-style button with rounded feel and hover effect.</summary>
+        private static Button CreateStyledButton(string text, Color foreColor, Color backColor, Color hoverColor)
         {
             Button btn = new Button
             {
                 Text = text,
-                Size = new Size(110, 36),
+                Size = new Size(114, 38),
                 FlatStyle = FlatStyle.Flat,
                 ForeColor = foreColor,
                 BackColor = backColor,
@@ -204,12 +233,13 @@ namespace OneNoteAI.UI
                 Cursor = Cursors.Hand
             };
             btn.FlatAppearance.BorderColor = backColor == Color.Transparent
-                ? Color.FromArgb(209, 213, 219)
-                : Color.FromArgb(Math.Max(0, backColor.R - 20), Math.Max(0, backColor.G - 20), Math.Max(0, backColor.B - 20));
+                ? Color.FromArgb(214, 211, 219)
+                : Color.FromArgb(
+                    Math.Max(0, backColor.R - 15),
+                    Math.Max(0, backColor.G - 15),
+                    Math.Max(0, backColor.B - 15));
             btn.FlatAppearance.BorderSize = 1;
-            btn.FlatAppearance.MouseOverBackColor = backColor == Color.Transparent
-                ? Color.FromArgb(243, 244, 246)
-                : Color.FromArgb(Math.Min(255, backColor.R + 15), Math.Min(255, backColor.G + 15), Math.Min(255, backColor.B + 15));
+            btn.FlatAppearance.MouseOverBackColor = hoverColor;
             return btn;
         }
 
@@ -379,7 +409,7 @@ namespace OneNoteAI.UI
             {
                 int level = headingMatch.Groups[1].Value.Length;
                 float size = level == 1 ? 16F : level == 2 ? 14F : 12F;
-                AppendInlineFormattedText(headingMatch.Groups[2].Value, new Font("Microsoft YaHei UI", size, FontStyle.Bold, GraphicsUnit.Point), Color.FromArgb(32, 43, 63));
+                AppendInlineFormattedText(headingMatch.Groups[2].Value, new Font("Microsoft YaHei UI", size, FontStyle.Bold, GraphicsUnit.Point), Color.FromArgb(128, 57, 123));
                 return;
             }
 
@@ -405,7 +435,7 @@ namespace OneNoteAI.UI
         private void AppendBulletPrefix(string prefix, bool highlight)
         {
             Font font = new Font("Microsoft YaHei UI", 10F, FontStyle.Bold, GraphicsUnit.Point);
-            Color color = highlight ? Color.FromArgb(0, 120, 215) : Color.FromArgb(80, 80, 80);
+            Color color = highlight ? Color.FromArgb(128, 57, 123) : Color.FromArgb(100, 90, 110);
 
             _rtbResult.SelectionStart = _rtbResult.TextLength;
             _rtbResult.SelectionLength = 0;
@@ -539,7 +569,7 @@ namespace OneNoteAI.UI
         private void OnDialogResize(object sender, EventArgs e)
         {
             int top = 13;
-            int right = _buttonPanel.ClientSize.Width - 16;
+            int right = _buttonPanel.ClientSize.Width - 20;
 
             // Right-aligned: Close, Copy, Insert
             _btnClose.Location = new Point(right - _btnClose.Width, top);
@@ -547,7 +577,7 @@ namespace OneNoteAI.UI
             _btnInsert.Location = new Point(_btnCopy.Left - 8 - _btnInsert.Width, top);
 
             // Left-aligned: Regenerate, FollowUp
-            _btnRegenerate.Location = new Point(16, top);
+            _btnRegenerate.Location = new Point(20, top);
             _btnFollowUp.Location = new Point(_btnRegenerate.Right + 8, top);
         }
     }
