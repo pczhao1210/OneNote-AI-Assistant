@@ -4,8 +4,23 @@ using Newtonsoft.Json;
 
 namespace OneNoteAI.Settings
 {
+    /// <summary>
+    /// Supported AI provider presets. The user can also choose "Custom"
+    /// and provide their own base URL.
+    /// </summary>
+    public enum AiProvider
+    {
+        DeepSeek = 0,
+        OpenAI = 1,
+        Ollama = 2,
+        Custom = 3
+    }
+
     public class AppSettings
     {
+        [JsonProperty("provider")]
+        public AiProvider Provider { get; set; } = AiProvider.DeepSeek;
+
         [JsonProperty("apiKey")]
         public string ApiKey { get; set; }
 
@@ -29,6 +44,46 @@ namespace OneNoteAI.Settings
 
         [JsonProperty("promptOverrides")]
         public PromptOverrides PromptOverrides { get; set; } = new PromptOverrides();
+
+        /// <summary>
+        /// Returns the effective API base URL based on the selected provider.
+        /// If the user has set a custom URL, it takes precedence.
+        /// </summary>
+        public string GetEffectiveBaseUrl()
+        {
+            if (!string.IsNullOrWhiteSpace(ApiBaseUrl))
+            {
+                return ApiBaseUrl;
+            }
+
+            switch (Provider)
+            {
+                case AiProvider.OpenAI:
+                    return "https://api.openai.com/v1";
+                case AiProvider.Ollama:
+                    return "http://localhost:11434/v1";
+                case AiProvider.DeepSeek:
+                default:
+                    return "https://api.deepseek.com";
+            }
+        }
+
+        /// <summary>
+        /// Returns the default model name for the selected provider.
+        /// </summary>
+        public string GetDefaultModelForProvider()
+        {
+            switch (Provider)
+            {
+                case AiProvider.OpenAI:
+                    return "gpt-4o-mini";
+                case AiProvider.Ollama:
+                    return "qwen2.5:7b";
+                case AiProvider.DeepSeek:
+                default:
+                    return "deepseek-chat";
+            }
+        }
     }
 
     /// <summary>
