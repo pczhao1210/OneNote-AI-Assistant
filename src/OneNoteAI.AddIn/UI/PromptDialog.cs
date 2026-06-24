@@ -30,52 +30,66 @@ namespace OneNoteAI.UI
             _placeholder = placeholder;
 
             Text = string.IsNullOrWhiteSpace(title) ? "输入" : title;
-            ClientSize = new Size(500, 300);
+            ClientSize = new Size(540, 340);
             FormBorderStyle = FormBorderStyle.FixedDialog;
             StartPosition = FormStartPosition.CenterParent;
             MaximizeBox = false;
             MinimizeBox = false;
             ShowInTaskbar = true;
             TopMost = true;
-            Font = new Font("Microsoft YaHei UI", 9F, FontStyle.Regular, GraphicsUnit.Point);
+            Theme.ApplyTo(this);
 
+            // ── Header ──
+            Panel header = Theme.CreateHeader(string.IsNullOrWhiteSpace(title) ? "输入" : title, 42);
+            Controls.Add(header);
+
+            // ── Instruction label ──
             _lblInstruction = new Label
             {
                 AutoSize = false,
-                Location = new Point(18, 18),
-                Size = new Size(464, 40),
-                Text = string.IsNullOrWhiteSpace(instructionText) ? "请输入内容：" : instructionText
+                Location = new Point(24, 56),
+                Size = new Size(492, 40),
+                Text = string.IsNullOrWhiteSpace(instructionText) ? "请输入内容：" : instructionText,
+                ForeColor = Theme.TextPrimary,
+                Font = Theme.FontContent
+            };
+
+            // ── Input box with card-like border ──
+            Panel inputCard = new Panel
+            {
+                Location = new Point(24, 100),
+                Size = new Size(492, 158),
+                BackColor = Theme.BgCardBorder
             };
 
             _txtInput = new TextBox
             {
-                Location = new Point(18, 66),
-                Size = new Size(464, 158),
+                Location = new Point(1, 1),
+                Size = new Size(490, 156),
                 Multiline = true,
                 ScrollBars = ScrollBars.Vertical,
                 AcceptsReturn = true,
                 AcceptsTab = true,
-                WordWrap = true
+                WordWrap = true,
+                BorderStyle = BorderStyle.None,
+                BackColor = Color.White,
+                Font = Theme.FontContent
             };
+            inputCard.Controls.Add(_txtInput);
 
-            _btnOk = new Button
-            {
-                Text = "确定",
-                Size = new Size(90, 30),
-                Location = new Point(296, 246),
-                DialogResult = DialogResult.OK
-            };
+            // ── Buttons ──
+            _btnOk = Theme.CreatePrimaryButton("确定");
+            _btnOk.Location = new Point(312, 278);
+            _btnOk.Size = new Size(96, 36);
+            _btnOk.DialogResult = DialogResult.OK;
 
-            _btnCancel = new Button
-            {
-                Text = "取消",
-                Size = new Size(90, 30),
-                Location = new Point(392, 246),
-                DialogResult = DialogResult.Cancel
-            };
+            _btnCancel = Theme.CreateSecondaryButton("取消");
+            _btnCancel.Location = new Point(416, 278);
+            _btnCancel.Size = new Size(96, 36);
+            _btnCancel.DialogResult = DialogResult.Cancel;
 
             Controls.Add(_lblInstruction);
-            Controls.Add(_txtInput);
+            Controls.Add(inputCard);
             Controls.Add(_btnOk);
             Controls.Add(_btnCancel);
 

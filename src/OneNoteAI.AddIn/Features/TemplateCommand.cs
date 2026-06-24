@@ -277,26 +277,36 @@ namespace OneNoteAI.Features
             using (Form dlg = new Form())
             {
                 dlg.Text = "选择模板";
-                dlg.Size = new System.Drawing.Size(360, 380);
+                dlg.ClientSize = new System.Drawing.Size(380, 400);
                 dlg.StartPosition = FormStartPosition.CenterScreen;
                 dlg.FormBorderStyle = FormBorderStyle.FixedDialog;
                 dlg.MaximizeBox = false;
                 dlg.MinimizeBox = false;
                 dlg.TopMost = true;
+                Theme.ApplyTo(dlg);
+
+                Panel header = Theme.CreateHeader("选择模板", 42);
+                dlg.Controls.Add(header);
 
                 Label label = new Label
                 {
                     Text = "请选择要使用的笔记模板：",
-                    Location = new System.Drawing.Point(12, 12),
-                    AutoSize = true
+                    Location = new System.Drawing.Point(20, 54),
+                    Size = new System.Drawing.Size(340, 24),
+                    Font = Theme.FontContent,
+                    ForeColor = Theme.TextPrimary
                 };
                 dlg.Controls.Add(label);
 
                 ListBox listBox = new ListBox
                 {
-                    Location = new System.Drawing.Point(12, 36),
-                    Size = new System.Drawing.Size(320, 240),
-                    Font = new System.Drawing.Font("Microsoft YaHei UI", 10f)
+                    Location = new System.Drawing.Point(20, 82),
+                    Size = new System.Drawing.Size(340, 246),
+                    Font = Theme.FontContent,
+                    ForeColor = Theme.TextPrimary,
+                    BackColor = System.Drawing.Color.White,
+                    BorderStyle = BorderStyle.FixedSingle,
+                    ItemHeight = 28
                 };
                 for (int i = 0; i < Templates.Length; i++)
                 {
@@ -305,27 +315,20 @@ namespace OneNoteAI.Features
                 listBox.SelectedIndex = 0;
                 dlg.Controls.Add(listBox);
 
-                Button btnOk = new Button
-                {
-                    Text = "确定",
-                    DialogResult = DialogResult.OK,
-                    Location = new System.Drawing.Point(150, 290),
-                    Size = new System.Drawing.Size(80, 32)
-                };
+                Button btnOk = Theme.CreatePrimaryButton("确定");
+                btnOk.DialogResult = DialogResult.OK;
+                btnOk.Location = new System.Drawing.Point(172, 344);
+                btnOk.Size = new System.Drawing.Size(88, 36);
                 dlg.Controls.Add(btnOk);
                 dlg.AcceptButton = btnOk;
 
-                Button btnCancel = new Button
-                {
-                    Text = "取消",
-                    DialogResult = DialogResult.Cancel,
-                    Location = new System.Drawing.Point(240, 290),
-                    Size = new System.Drawing.Size(80, 32)
-                };
+                Button btnCancel = Theme.CreateSecondaryButton("取消");
+                btnCancel.DialogResult = DialogResult.Cancel;
+                btnCancel.Location = new System.Drawing.Point(268, 344);
+                btnCancel.Size = new System.Drawing.Size(88, 36);
                 dlg.Controls.Add(btnCancel);
                 dlg.CancelButton = btnCancel;
 
-                // Double-click also confirms
                 listBox.DoubleClick += delegate { dlg.DialogResult = DialogResult.OK; dlg.Close(); };
 
                 if (dlg.ShowDialog(UiThread.Anchor) != DialogResult.OK)

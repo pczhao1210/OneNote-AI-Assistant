@@ -25,43 +25,52 @@ namespace OneNoteAI.UI
         public ScopeDialog(string title, string sectionName, int sectionPageCount, ScopeKind defaultScope = ScopeKind.CurrentPage)
         {
             Text = string.IsNullOrWhiteSpace(title) ? "选择范围" : title;
-            ClientSize = new Size(420, 200);
+            ClientSize = new Size(440, 250);
             FormBorderStyle = FormBorderStyle.FixedDialog;
             StartPosition = FormStartPosition.CenterScreen;
             MaximizeBox = false;
             MinimizeBox = false;
             ShowInTaskbar = true;
             TopMost = true;
-            Font = new Font("Microsoft YaHei UI", 9F, FontStyle.Regular, GraphicsUnit.Point);
+            Theme.ApplyTo(this);
+
+            // ── Header ──
+            Panel header = Theme.CreateHeader(string.IsNullOrWhiteSpace(title) ? "选择范围" : title, 42);
+            Controls.Add(header);
 
             Label lblHeader = new Label
             {
                 AutoSize = false,
-                Location = new Point(18, 16),
-                Size = new Size(380, 22),
-                Font = new Font("Microsoft YaHei UI", 10F, FontStyle.Bold, GraphicsUnit.Point),
+                Location = new Point(24, 56),
+                Size = new Size(392, 24),
+                Font = Theme.FontHeading,
+                ForeColor = Theme.TextPrimary,
                 Text = "请选择处理范围："
             };
 
             _rbPage = new RadioButton
             {
                 AutoSize = false,
-                Location = new Point(24, 50),
-                Size = new Size(374, 24),
+                Location = new Point(30, 90),
+                Size = new Size(380, 26),
                 Text = "仅当前页面",
+                Font = Theme.FontContent,
+                ForeColor = Theme.TextPrimary,
                 Checked = defaultScope == ScopeKind.CurrentPage
             };
 
             string sectionLabel = string.IsNullOrWhiteSpace(sectionName)
                 ? string.Format("当前分区（共 {0} 页）", sectionPageCount)
-                : string.Format("当前分区 \"{0}\"（共 {1} 页）", sectionName, sectionPageCount);
+                : string.Format("当前分区「{0}」（共 {1} 页）", sectionName, sectionPageCount);
 
             _rbSection = new RadioButton
             {
                 AutoSize = false,
-                Location = new Point(24, 82),
-                Size = new Size(374, 24),
+                Location = new Point(30, 122),
+                Size = new Size(380, 26),
                 Text = sectionLabel,
+                Font = Theme.FontContent,
+                ForeColor = Theme.TextPrimary,
                 Checked = defaultScope == ScopeKind.CurrentSection,
                 Enabled = sectionPageCount > 0
             };
@@ -69,27 +78,21 @@ namespace OneNoteAI.UI
             Label lblHint = new Label
             {
                 AutoSize = false,
-                Location = new Point(24, 110),
-                Size = new Size(374, 36),
-                ForeColor = Color.FromArgb(110, 118, 130),
+                Location = new Point(30, 156),
+                Size = new Size(380, 36),
+                ForeColor = Theme.TextMuted,
                 Text = "提示：分区范围会逐页处理后汇总，耗时与页数成正比。"
             };
 
-            _btnOk = new Button
-            {
-                Text = "确定",
-                Size = new Size(90, 30),
-                Location = new Point(216, 156),
-                DialogResult = DialogResult.OK
-            };
+            _btnOk = Theme.CreatePrimaryButton("确定");
+            _btnOk.Location = new Point(236, 200);
+            _btnOk.Size = new Size(90, 34);
+            _btnOk.DialogResult = DialogResult.OK;
 
-            _btnCancel = new Button
-            {
-                Text = "取消",
-                Size = new Size(90, 30),
-                Location = new Point(312, 156),
-                DialogResult = DialogResult.Cancel
-            };
+            _btnCancel = Theme.CreateSecondaryButton("取消");
+            _btnCancel.Location = new Point(334, 200);
+            _btnCancel.Size = new Size(90, 34);
+            _btnCancel.DialogResult = DialogResult.Cancel;
 
             Controls.Add(lblHeader);
             Controls.Add(_rbPage);

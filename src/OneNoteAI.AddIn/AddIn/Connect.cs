@@ -331,5 +331,16 @@ namespace OneNoteAI.AddIn
                 }
             });
         }
+
+        public void OnHelp(IRibbonControl control)
+        {
+            UiThread.Post(delegate
+            {
+                using (var dlg = new HelpDialog())
+                {
+                    dlg.ShowDialog(UiThread.Anchor);
+                }
+            });
+        }
     }
 }

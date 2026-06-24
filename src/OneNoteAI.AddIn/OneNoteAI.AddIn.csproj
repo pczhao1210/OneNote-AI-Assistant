@@ -102,6 +102,8 @@
     <Compile Include="UI\Msg.cs" />
     <Compile Include="UI\ForceForeground.cs" />
     <Compile Include="UI\ScopeDialog.cs" />
+    <Compile Include="UI\Theme.cs" />
+    <Compile Include="UI\HelpDialog.cs" />
     <Compile Include="OneNote\ScopeKind.cs" />
     <Compile Include="Features\SummarizeCommand.cs" />
     <Compile Include="Features\GenerateCommand.cs" />

@@ -12,6 +12,7 @@
           <button id="btnTag" label="标签" onAction="OnTag" size="large" imageMso="CategorizeMenu" screentip="自动标签" supertip="AI 自动分析页面内容，生成标签、分类和主题摘要"/>
           <button id="btnExtractTodos" label="提取待办" onAction="OnExtractTodos" size="large" imageMso="TaskAssign" screentip="提取待办事项" supertip="使用 AI 从当前页面或整个分区中提取行动项和待办事项"/>
           <button id="btnSettings" label="设置" onAction="OnSettings" size="large" imageMso="ControlProperties" screentip="插件设置" supertip="配置 API Key 和其他选项"/>
+          <button id="btnHelp" label="帮助" onAction="OnHelp" size="large" imageMso="Help" screentip="使用帮助" supertip="查看 OneNote AI Assistant 的详细使用说明"/>
         </group>
       </tab>
     </tabs>
