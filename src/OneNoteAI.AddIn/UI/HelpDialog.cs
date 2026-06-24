@@ -30,28 +30,20 @@ namespace OneNoteAI.UI
             Panel header = Theme.CreateHeader("使用帮助");
             Panel stripe = Theme.CreateAccentStripe();
 
-            // ── Splitter layout ──
-            SplitContainer splitter = new SplitContainer
-            {
-                Dock = DockStyle.Fill,
-                SplitterWidth = 4,
-                BackColor = Theme.BgCardBorder,
-                Panel1MinSize = 100,
-                Panel2MinSize = 200
-            };
-            // Defer SplitterDistance to Load event when layout is complete
-            Load += delegate
-            {
-                try { splitter.SplitterDistance = 210; }
-                catch { /* ignore if still too small */ }
-            };
-
-            // ── Left: Topic tree ──
+            // ── Two-panel layout (no SplitContainer to avoid MinSize bugs) ──
             Panel treePanel = new Panel
             {
-                Dock = DockStyle.Fill,
+                Dock = DockStyle.Left,
+                Width = 210,
                 BackColor = Color.FromArgb(252, 250, 254),
                 Padding = new Padding(8, 8, 4, 8)
+            };
+
+            Panel splitterBar = new Panel
+            {
+                Dock = DockStyle.Left,
+                Width = 1,
+                BackColor = Theme.BgCardBorder
             };
 
             Label treeHeader = new Label
@@ -82,7 +74,6 @@ namespace OneNoteAI.UI
 
             treePanel.Controls.Add(_treeTopics);
             treePanel.Controls.Add(treeHeader);
-            splitter.Panel1.Controls.Add(treePanel);
 
             // ── Right: Content area ──
             Panel contentPanel = new Panel
@@ -102,7 +93,6 @@ namespace OneNoteAI.UI
                 ScrollBars = RichTextBoxScrollBars.Vertical
             };
             contentPanel.Controls.Add(_rtbContent);
-            splitter.Panel2.Controls.Add(contentPanel);
 
             // ── Footer ──
             Panel footer = new Panel
@@ -123,8 +113,10 @@ namespace OneNoteAI.UI
             btnClose.Click += delegate { Close(); };
             footer.Controls.Add(btnClose);
 
-            // ── Assembly ──
-            Controls.Add(splitter);
+            // ── Assembly (order matters for Dock: Fill added first) ──
+            Controls.Add(contentPanel);
+            Controls.Add(splitterBar);
+            Controls.Add(treePanel);
             Controls.Add(footer);
             Controls.Add(header);
             Controls.Add(stripe);
