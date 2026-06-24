@@ -284,11 +284,19 @@ namespace OneNoteAI.Features
             {
                 progress = ProgressOverlay.Show(null);
 
-                // ── Gather all page content with titles ──
+                // ── Gather all page content with titles (token-budget aware) ──
                 progress.UpdateStatus("正在读取分区页面...");
                 StringBuilder contextBuilder = new StringBuilder();
                 int loadedPages = 0;
 
+                // Token budget: reserve tokens for system prompt, question, and response.
+                // DeepSeek context window is ~32k tokens; we use ~20k for page content.
+                const int MaxContextTokens = 20000;
+                const int SystemOverhead = 1500; // system prompt + question + formatting
+                int remainingBudget = MaxContextTokens - SystemOverhead;
+
+                // First pass: read all pages and estimate tokens
+                List<(string Title, string Text, int Tokens)> pageData = new List<(string, string, int)>();
                 for (int i = 0; i < sectionPages.Count; i++)
                 {
                     progress.Token.ThrowIfCancellationRequested();
@@ -312,9 +320,46 @@ namespace OneNoteAI.Features
                         continue;
                     }
 
-                    // Truncate very long pages to fit within token limits
-                    string truncatedText = TruncateContent(pageText, 2000);
-                    contextBuilder.AppendFormat("\n\n【页面：{0}】\n{1}", entry.Title, truncatedText);
+                    int pageTokens = TokenEstimator.Estimate(pageText);
+                    pageData.Add((entry.Title, pageText, pageTokens));
+                }
+
+                if (pageData.Count == 0)
+                {
+                    if (progress != null && !progress.IsDisposed) progress.Close();
+                    Msg.Show("分区内所有页面均为空。", "OneNote AI Assistant", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                // Second pass: allocate budget proportionally
+                int totalTokens = 0;
+                for (int i = 0; i < pageData.Count; i++) totalTokens += pageData[i].Tokens;
+
+                progress.UpdateStatus("正在构建上下文...");
+                for (int i = 0; i < pageData.Count; i++)
+                {
+                    if (remainingBudget <= 200) break; // stop if budget exhausted
+
+                    var pd = pageData[i];
+                    int allowedChars;
+                    if (totalTokens <= remainingBudget)
+                    {
+                        // All pages fit, no truncation needed
+                        allowedChars = pd.Text.Length;
+                    }
+                    else
+                    {
+                        // Proportional allocation: each page gets budget share
+                        double share = (double)pd.Tokens / totalTokens;
+                        int allowedTokens = Math.Max(200, (int)(remainingBudget * share));
+                        allowedChars = Math.Min(pd.Text.Length, allowedTokens * 2); // ~2 chars/token for Chinese
+                    }
+
+                    string truncatedText = TruncateContent(pd.Text, allowedChars);
+                    int usedTokens = TokenEstimator.Estimate(truncatedText);
+                    remainingBudget -= usedTokens;
+
+                    contextBuilder.AppendFormat("\n\n【页面：{0}】\n{1}", pd.Title, truncatedText);
                     loadedPages++;
                 }
 
