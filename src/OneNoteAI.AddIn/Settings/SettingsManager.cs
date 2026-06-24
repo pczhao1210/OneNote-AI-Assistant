@@ -40,7 +40,7 @@ namespace OneNoteAI.Settings
         public int MaxTokens { get; set; } = 4096;
 
         [JsonProperty("language")]
-        public string Language { get; set; } = "zh-CN";
+        public string Language { get; set; } = "auto";
 
         [JsonProperty("promptOverrides")]
         public PromptOverrides PromptOverrides { get; set; } = new PromptOverrides();

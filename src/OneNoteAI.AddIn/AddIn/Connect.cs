@@ -223,6 +223,55 @@ namespace OneNoteAI.AddIn
             Logger.Info("Ribbon loaded");
         }
 
+        // ── Dynamic label callbacks for i18n ──
+
+        public string GetTabLabel(IRibbonControl control)
+        {
+            return Strings.RibbonTab;
+        }
+
+        public string GetGroupLabel(IRibbonControl control)
+        {
+            return Strings.RibbonGroup;
+        }
+
+        public string GetLabel(IRibbonControl control)
+        {
+            switch (control.Id)
+            {
+                case "btnSummarize": return Strings.BtnSummarize;
+                case "btnGenerate": return Strings.BtnGenerate;
+                case "btnTemplate": return Strings.BtnTemplate;
+                case "btnRewrite": return Strings.BtnRewrite;
+                case "btnQA": return Strings.BtnQA;
+                case "btnTranslate": return Strings.BtnTranslate;
+                case "btnTag": return Strings.BtnTag;
+                case "btnExtractTodos": return Strings.BtnExtractTodos;
+                case "btnSettings": return Strings.BtnSettings;
+                case "btnHelp": return Strings.BtnHelp;
+                default: return control.Id;
+            }
+        }
+
+        public string GetScreentip(IRibbonControl control)
+        {
+            bool zh = Strings.IsChinese;
+            switch (control.Id)
+            {
+                case "btnSummarize": return zh ? "智能摘要" : "AI Summary";
+                case "btnGenerate": return zh ? "生成内容" : "Generate Content";
+                case "btnTemplate": return zh ? "模板生成" : "Template Generation";
+                case "btnRewrite": return zh ? "智能改写" : "AI Rewrite";
+                case "btnQA": return zh ? "智能问答" : "AI Q&A";
+                case "btnTranslate": return zh ? "智能翻译" : "AI Translate";
+                case "btnTag": return zh ? "自动标签" : "Auto Tag";
+                case "btnExtractTodos": return zh ? "提取待办" : "Extract Todos";
+                case "btnSettings": return zh ? "插件设置" : "Settings";
+                case "btnHelp": return zh ? "使用帮助" : "Help";
+                default: return "";
+            }
+        }
+
         /// <summary>
         /// Ribbon loadImage callback. customUI root declares loadImage="LoadImage"
         /// and each button uses image="Foo.png"; Office invokes this once per
