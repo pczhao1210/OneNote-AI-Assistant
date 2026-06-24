@@ -97,9 +97,10 @@ namespace OneNoteAI.Features
             string targetLanguage;
             using (PromptDialog langDialog = new PromptDialog(
                 "翻译 - 选择目标语言",
-                isSelection ? "将翻译选中的文本。请输入目标语言（如：英文、中文、日文）：" : "将翻译当前页面内容。请输入目标语言（如：英文、中文、日文）：",
-                "英文",
-                string.Join("、", TargetLanguages)))
+                isSelection
+                    ? "将翻译选中的文本。请输入目标语言（如：英文、中文、日文、韩文、法文、德文、西班牙文、俄文）："
+                    : "将翻译当前页面内容。请输入目标语言（如：英文、中文、日文、韩文、法文、德文、西班牙文、俄文）：",
+                "英文"))
             {
                 if (langDialog.ShowDialog(UiThread.Anchor) != DialogResult.OK)
                 {
