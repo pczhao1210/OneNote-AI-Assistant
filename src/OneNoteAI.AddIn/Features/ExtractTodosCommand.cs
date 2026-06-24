@@ -440,29 +440,41 @@ namespace OneNoteAI.Features
             int completedCount = 0;
             int pendingCount = 0;
 
+            // Show completed items
             foreach (TextBlock block in taggedTodos)
             {
                 if (block.Tag.Completed)
                 {
-                    sb.AppendFormat("✅ {0}\n", block.Text.Trim());
+                    string tagLabel = string.IsNullOrWhiteSpace(block.Tag.TagName)
+                        ? "" : string.Format(" [{0}]", block.Tag.TagName);
+                    sb.AppendFormat("✅ ~~{0}~~{1}\n", block.Text.Trim(), tagLabel);
                     completedCount++;
                 }
-                else
+            }
+
+            // Show pending items
+            foreach (TextBlock block in taggedTodos)
+            {
+                if (!block.Tag.Completed)
                 {
-                    sb.AppendFormat("☐ {0}\n", block.Text.Trim());
+                    string tagLabel = string.IsNullOrWhiteSpace(block.Tag.TagName)
+                        ? "" : string.Format(" [{0}]", block.Tag.TagName);
+                    sb.AppendFormat("☐ {0}{1}\n", block.Text.Trim(), tagLabel);
                     pendingCount++;
                 }
             }
 
-            sb.AppendFormat("\n**统计：** {0} 项未完成，{1} 项已完成\n\n", pendingCount, completedCount);
+            sb.AppendFormat("\n**统计：** {0} 项未完成，{1} 项已完成（共 {2} 项）\n\n",
+                pendingCount, completedCount, pendingCount + completedCount);
             sb.AppendLine("---\n");
 
             return sb.ToString();
         }
 
         /// <summary>
-        /// Builds a smart prompt that asks AI to find action items in untagged text,
-        /// without duplicating already-tagged items.
+        /// Builds a smart prompt that asks AI to find TRUE action items in untagged text.
+        /// Strictly distinguishes information lists from actual todos.
+        /// Filters out sensitive information (API keys, passwords, etc.)
         /// </summary>
         private static string BuildSmartExtractPrompt(string untaggedText, bool hasNativeTags)
         {
@@ -471,19 +483,42 @@ namespace OneNoteAI.Features
                 return string.Empty;
             }
 
+            // Security: filter out potential sensitive info
+            string safeText = FilterSensitiveContent(untaggedText);
+
             string instruction = hasNativeTags
                 ? "以下是笔记中**未被标记**的文本内容。页面中已有一些 OneNote 原生待办标记（已在上方展示）。\n" +
-                  "请仅从以下未标记的文本中识别**隐含的行动项和待办事项**。\n" +
-                  "注意：不要重复上方已有的标记项。只提取新发现的潜在行动项。\n\n"
-                : "请从以下笔记内容中识别所有待办事项和行动项：\n\n";
+                  "请仅从以下未标记的文本中识别**真正需要执行的行动项**。\n\n"
+                : "请从以下笔记内容中识别**真正需要执行的行动项**：\n\n";
 
-            string prefix = hasNativeTags
-                ? "## AI 发现的潜在行动项\n\n"
-                : "";
+            string rules =
+                "**严格判断规则：**\n" +
+                "- ✅ 是待办：有明确动作（安装、完成、提交、联系、修复、准备、发送等动词）+ 明确对象\n" +
+                "- ❌ 不是待办：纯信息列表、功能介绍、知识点记录、推荐清单、参考资料\n" +
+                "- ❌ 不是待办：已经完成的描述、过去时态的记录\n" +
+                "- ❌ 不是待办：\"xxx是...\"、\"xxx支持...\"、\"xxx包含...\" 这类描述性语句\n\n" +
+                "如果整个内容都是**信息记录/知识列表/工具推荐**，没有真正的行动要求，请直接输出：\n" +
+                "（未发现需要执行的待办事项。当前内容为信息记录/推荐列表。）\n\n";
 
-            return instruction + untaggedText + "\n\n" +
-                   "如果发现了待办事项，请在输出开头加上：" + prefix +
-                   "如果未发现任何新的行动项，请输出：（未发现额外的待办事项）";
+            string prefix = hasNativeTags ? "## AI 发现的潜在行动项\n\n" : "";
+
+            return instruction + rules + "---\n笔记内容：\n\n" + safeText + "\n\n" +
+                   "如果发现了真正的待办事项，请在输出开头加上：" + prefix;
+        }
+
+        /// <summary>
+        /// Filters out sensitive content like API keys, passwords, tokens.
+        /// </summary>
+        private static string FilterSensitiveContent(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return text;
+
+            // Replace patterns that look like API keys or tokens
+            string result = System.Text.RegularExpressions.Regex.Replace(
+                text, @"(sk-|key[=:]\s*|token[=:]\s*|password[=:]\s*|secret[=:]\s*)[A-Za-z0-9\-_]{16,}",
+                "$1[已隐藏]", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+            return result;
         }
     }
 }

@@ -96,19 +96,19 @@ namespace OneNoteAI.OneNote.Models
         public bool Completed { get; set; }
         public string TagName { get; set; }
 
-        /// <summary>True if this is a To-Do / checkbox type tag.</summary>
+        /// <summary>
+        /// True if this tag represents any kind of actionable/checkbox item.
+        /// In OneNote, any tag with a completed attribute is a checkbox-type tag.
+        /// We treat ALL tags as relevant for todo extraction — the green checkmark,
+        /// the checkbox, priority tags, follow-up tags, etc.
+        /// </summary>
         public bool IsToDoTag
         {
             get
             {
-                // OneNote To-Do tags: type=0 or type=1 (checkbox variants)
-                // Also check by name patterns
-                if (string.IsNullOrEmpty(TagName)) return true; // default tag is To-Do
-                string lower = TagName.ToLowerInvariant();
-                return lower.Contains("to do") || lower.Contains("todo")
-                    || lower.Contains("待办") || lower.Contains("优先待办")
-                    || lower.Contains("后续") || lower.Contains("安排")
-                    || lower.Contains("回拨") || lower.Contains("客户要求");
+                // All tags are relevant. OneNote uses Tag element with completed
+                // attribute for any checkbox-like marker (To Do, priority, follow-up, etc.)
+                return true;
             }
         }
     }
