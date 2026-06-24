@@ -35,7 +35,10 @@ namespace OneNoteAI.OneNote
             XDocument pageDoc = GetPageDocument(pageId);
             XElement pageElement = GetPageElement(pageDoc);
             double nextY = CalculateNextOutlineY(pageDoc);
-            XElement outlineElement = CreateOutlineElement(nextY, heading, new List<string> { content }, true, true);
+
+            // Convert Markdown to structured OE elements
+            List<string> lines = SplitIntoLines(content);
+            XElement outlineElement = CreateMarkdownOutlineElement(nextY, heading, lines);
 
             pageElement.Add(outlineElement);
             UpdatePage(pageDoc);
@@ -110,6 +113,113 @@ namespace OneNoteAI.OneNote
             return new XElement(OneNs + "OE",
                 new XElement(OneNs + "T",
                     new XCData("──────── AI 生成内容 ────────")));
+        }
+
+        // ── Markdown-aware outline creation ──────────────────────────────
+
+        private XElement CreateMarkdownOutlineElement(double y, string heading, List<string> lines)
+        {
+            XElement childrenElement = new XElement(OneNs + "OEChildren");
+
+            // Separator
+            childrenElement.Add(CreateSeparatorElement());
+
+            // Heading
+            if (!string.IsNullOrWhiteSpace(heading))
+            {
+                childrenElement.Add(CreateTextOeElement("<b>" + WebUtility.HtmlEncode(heading.Trim()) + "</b>"));
+            }
+
+            // Process each line with Markdown awareness
+            for (int i = 0; i < lines.Count; i++)
+            {
+                string line = lines[i];
+
+                // Empty line → spacing (skip to avoid empty OE)
+                if (string.IsNullOrWhiteSpace(line))
+                {
+                    childrenElement.Add(CreateTextOeElement(" "));
+                    continue;
+                }
+
+                // ## Heading → bold + larger style
+                if (line.StartsWith("## "))
+                {
+                    string headingText = line.Substring(3).Trim();
+                    childrenElement.Add(CreateTextOeElement(
+                        "<span style='font-size:14pt;font-weight:bold'>" +
+                        WebUtility.HtmlEncode(headingText) + "</span>"));
+                    continue;
+                }
+
+                // ### Sub-heading → bold
+                if (line.StartsWith("### "))
+                {
+                    string subText = line.Substring(4).Trim();
+                    childrenElement.Add(CreateTextOeElement(
+                        "<span style='font-size:12pt;font-weight:bold'>" +
+                        WebUtility.HtmlEncode(subText) + "</span>"));
+                    continue;
+                }
+
+                // --- or ─── → horizontal rule
+                if (line.StartsWith("---") || line.StartsWith("───"))
+                {
+                    childrenElement.Add(CreateTextOeElement("────────────────────────────────"));
+                    continue;
+                }
+
+                // Regular line with inline Markdown formatting
+                string html = ConvertInlineMarkdown(line);
+                childrenElement.Add(CreateTextOeElement(html));
+            }
+
+            return new XElement(OneNs + "Outline",
+                new XElement(OneNs + "Position",
+                    new XAttribute("x", FormatDouble(36d)),
+                    new XAttribute("y", FormatDouble(y))),
+                childrenElement);
+        }
+
+        /// <summary>
+        /// Converts inline Markdown formatting to HTML that OneNote understands.
+        /// Handles: **bold**, *italic*, `code`, ☐ todo items, numbered lists, bullet lists.
+        /// </summary>
+        private string ConvertInlineMarkdown(string line)
+        {
+            string result = line;
+
+            // Bullet points: - text or * text → bullet character + text
+            if (result.StartsWith("- ") || result.StartsWith("* "))
+            {
+                result = "• " + result.Substring(2);
+            }
+
+            // Numbered list: keep as-is (1. 2. 3. etc.)
+            // ☐ Todo items: keep as-is
+
+            // Encode HTML entities first (but preserve our own HTML)
+            result = WebUtility.HtmlEncode(result);
+
+            // **bold** → <b>bold</b>
+            result = System.Text.RegularExpressions.Regex.Replace(
+                result, @"\*\*(.+?)\*\*", "<b>$1</b>");
+
+            // *italic* → <i>italic</i> (but not inside **)
+            result = System.Text.RegularExpressions.Regex.Replace(
+                result, @"(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)", "<i>$1</i>");
+
+            // `code` → <span style='font-family:Consolas'>code</span>
+            result = System.Text.RegularExpressions.Regex.Replace(
+                result, @"`(.+?)`", "<span style='font-family:Consolas;background-color:#f0f0f0'>$1</span>");
+
+            return result;
+        }
+
+        private List<string> SplitIntoLines(string content)
+        {
+            string normalized = NormalizeLineEndings(content);
+            return new List<string>(normalized.Split('\n'));
         }
 
         private double CalculateNextOutlineY(XDocument pageDoc)
