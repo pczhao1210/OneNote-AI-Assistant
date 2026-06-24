@@ -60,12 +60,13 @@ namespace OneNoteAI.UI
         public ResultDialog(string title)
         {
             Text = string.IsNullOrWhiteSpace(title) ? "AI 结果" : title;
-            ClientSize = new Size(600, 500);
-            MinimumSize = new Size(520, 400);
+            ClientSize = new Size(680, 560);
+            MinimumSize = new Size(560, 420);
             StartPosition = FormStartPosition.CenterScreen;
             FormBorderStyle = FormBorderStyle.Sizable;
             ShowInTaskbar = true;
             TopMost = true;
+            BackColor = Color.FromArgb(245, 247, 250);
             Font = new Font("Microsoft YaHei UI", 9F, FontStyle.Regular, GraphicsUnit.Point);
 
             Shown += delegate
@@ -81,67 +82,85 @@ namespace OneNoteAI.UI
                 }
             };
 
+            // ── Header panel (brand bar) ──
+            Panel headerPanel = new Panel
+            {
+                Dock = DockStyle.Top,
+                Height = 44,
+                BackColor = Color.FromArgb(37, 99, 235), // Modern blue
+                Padding = new Padding(16, 0, 16, 0)
+            };
+
+            Label headerLabel = new Label
+            {
+                Text = "✦  " + (string.IsNullOrWhiteSpace(title) ? "AI 结果" : title),
+                ForeColor = Color.White,
+                Font = new Font("Microsoft YaHei UI", 11F, FontStyle.Bold, GraphicsUnit.Point),
+                AutoSize = false,
+                Dock = DockStyle.Fill,
+                TextAlign = ContentAlignment.MiddleLeft
+            };
+            headerPanel.Controls.Add(headerLabel);
+
+            // ── Content area ──
+            Panel contentPanel = new Panel
+            {
+                Dock = DockStyle.Fill,
+                Padding = new Padding(16, 12, 16, 12),
+                BackColor = Color.FromArgb(245, 247, 250)
+            };
+
             _rtbResult = new RichTextBox
             {
                 Dock = DockStyle.Fill,
                 ReadOnly = true,
-                BorderStyle = BorderStyle.FixedSingle,
+                BorderStyle = BorderStyle.None,
                 BackColor = Color.White,
                 HideSelection = true,
                 DetectUrls = true,
-                Font = new Font("Microsoft YaHei UI", 10F, FontStyle.Regular, GraphicsUnit.Point)
+                Font = new Font("Microsoft YaHei UI", 10.5F, FontStyle.Regular, GraphicsUnit.Point),
+                Margin = new Padding(0),
+                ScrollBars = RichTextBoxScrollBars.Vertical
             };
+            contentPanel.Controls.Add(_rtbResult);
 
+            // ── Button panel (modern action bar) ──
             _buttonPanel = new Panel
             {
                 Dock = DockStyle.Bottom,
-                Height = 56,
-                Padding = new Padding(12, 10, 12, 10)
+                Height = 62,
+                BackColor = Color.White,
+                Padding = new Padding(16, 12, 16, 12)
             };
 
-            _btnInsert = new Button
+            // Paint a top border line on button panel
+            _buttonPanel.Paint += delegate(object s, PaintEventArgs pe)
             {
-                Text = "插入到页面",
-                Size = new Size(110, 30),
-                Anchor = AnchorStyles.Right | AnchorStyles.Top
+                using (Pen pen = new Pen(Color.FromArgb(226, 232, 240)))
+                {
+                    pe.Graphics.DrawLine(pen, 0, 0, _buttonPanel.Width, 0);
+                }
             };
-            _btnInsert.Click += OnInsertClick;
 
-            _btnCopy = new Button
-            {
-                Text = "复制",
-                Size = new Size(90, 30),
-                Anchor = AnchorStyles.Right | AnchorStyles.Top
-            };
-            _btnCopy.Click += OnCopyClick;
-
-            _btnRegenerate = new Button
-            {
-                Text = "重新生成",
-                Size = new Size(100, 30),
-                Anchor = AnchorStyles.Left | AnchorStyles.Top,
-                Visible = false,
-                Enabled = false
-            };
+            _btnRegenerate = CreateModernButton("↻ 重新生成", Color.FromArgb(100, 116, 139), Color.FromArgb(241, 245, 249));
+            _btnRegenerate.Visible = false;
+            _btnRegenerate.Enabled = false;
             _btnRegenerate.Click += OnRegenerateClick;
 
-            _btnFollowUp = new Button
-            {
-                Text = "继续提问",
-                Size = new Size(100, 30),
-                Anchor = AnchorStyles.Left | AnchorStyles.Top,
-                Visible = false,
-                Enabled = false
-            };
+            _btnFollowUp = CreateModernButton("💬 继续提问", Color.FromArgb(100, 116, 139), Color.FromArgb(241, 245, 249));
+            _btnFollowUp.Visible = false;
+            _btnFollowUp.Enabled = false;
             _btnFollowUp.Click += OnFollowUpClick;
 
-            _btnClose = new Button
-            {
-                Text = "关闭",
-                Size = new Size(90, 30),
-                Anchor = AnchorStyles.Right | AnchorStyles.Top,
-                DialogResult = DialogResult.Cancel
-            };
+            _btnInsert = CreateModernButton("📥 插入页面", Color.White, Color.FromArgb(37, 99, 235));
+            _btnInsert.Click += OnInsertClick;
+
+            _btnCopy = CreateModernButton("📋 复制", Color.FromArgb(55, 65, 81), Color.FromArgb(243, 244, 246));
+            _btnCopy.Click += OnCopyClick;
+
+            _btnClose = CreateModernButton("关闭", Color.FromArgb(107, 114, 128), Color.Transparent);
+            _btnClose.FlatAppearance.BorderSize = 0;
+            _btnClose.DialogResult = DialogResult.Cancel;
             _btnClose.Click += delegate { Close(); };
 
             _buttonPanel.Controls.Add(_btnInsert);
@@ -150,8 +169,10 @@ namespace OneNoteAI.UI
             _buttonPanel.Controls.Add(_btnFollowUp);
             _buttonPanel.Controls.Add(_btnClose);
 
-            Controls.Add(_rtbResult);
+            // Add panels in correct order (header on top, buttons on bottom, content fills)
+            Controls.Add(contentPanel);
             Controls.Add(_buttonPanel);
+            Controls.Add(headerPanel);
 
             CancelButton = _btnClose;
 
@@ -167,6 +188,29 @@ namespace OneNoteAI.UI
                 _renderTimer.Stop();
                 _renderTimer.Dispose();
             };
+        }
+
+        /// <summary>Creates a modern flat button with rounded feel.</summary>
+        private static Button CreateModernButton(string text, Color foreColor, Color backColor)
+        {
+            Button btn = new Button
+            {
+                Text = text,
+                Size = new Size(110, 36),
+                FlatStyle = FlatStyle.Flat,
+                ForeColor = foreColor,
+                BackColor = backColor,
+                Font = new Font("Microsoft YaHei UI", 9F, FontStyle.Regular, GraphicsUnit.Point),
+                Cursor = Cursors.Hand
+            };
+            btn.FlatAppearance.BorderColor = backColor == Color.Transparent
+                ? Color.FromArgb(209, 213, 219)
+                : Color.FromArgb(Math.Max(0, backColor.R - 20), Math.Max(0, backColor.G - 20), Math.Max(0, backColor.B - 20));
+            btn.FlatAppearance.BorderSize = 1;
+            btn.FlatAppearance.MouseOverBackColor = backColor == Color.Transparent
+                ? Color.FromArgb(243, 244, 246)
+                : Color.FromArgb(Math.Min(255, backColor.R + 15), Math.Min(255, backColor.G + 15), Math.Min(255, backColor.B + 15));
+            return btn;
         }
 
         public void AppendText(string token)
@@ -494,12 +538,17 @@ namespace OneNoteAI.UI
 
         private void OnDialogResize(object sender, EventArgs e)
         {
-            int top = 10;
-            _btnClose.Location = new Point(_buttonPanel.ClientSize.Width - _btnClose.Width, top);
-            _btnCopy.Location = new Point(_btnClose.Left - 10 - _btnCopy.Width, top);
-            _btnInsert.Location = new Point(_btnCopy.Left - 10 - _btnInsert.Width, top);
-            _btnRegenerate.Location = new Point(0, top);
-            _btnFollowUp.Location = new Point(_btnRegenerate.Right + 10, top);
+            int top = 13;
+            int right = _buttonPanel.ClientSize.Width - 16;
+
+            // Right-aligned: Close, Copy, Insert
+            _btnClose.Location = new Point(right - _btnClose.Width, top);
+            _btnCopy.Location = new Point(_btnClose.Left - 8 - _btnCopy.Width, top);
+            _btnInsert.Location = new Point(_btnCopy.Left - 8 - _btnInsert.Width, top);
+
+            // Left-aligned: Regenerate, FollowUp
+            _btnRegenerate.Location = new Point(16, top);
+            _btnFollowUp.Location = new Point(_btnRegenerate.Right + 8, top);
         }
     }
 }
