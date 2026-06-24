@@ -36,11 +36,15 @@ namespace OneNoteAI.UI
                 Dock = DockStyle.Fill,
                 SplitterWidth = 4,
                 BackColor = Theme.BgCardBorder,
-                Panel1MinSize = 140,
-                Panel2MinSize = 300
+                Panel1MinSize = 100,
+                Panel2MinSize = 200
             };
-            // Set SplitterDistance after layout to avoid min-size conflicts
-            splitter.SplitterDistance = 200;
+            // Defer SplitterDistance to Load event when layout is complete
+            Load += delegate
+            {
+                try { splitter.SplitterDistance = 210; }
+                catch { /* ignore if still too small */ }
+            };
 
             // ── Left: Topic tree ──
             Panel treePanel = new Panel
