@@ -5,7 +5,7 @@
         <group id="grpOneNoteAI" label="AI 助手">
           <button id="btnSummarize" label="摘要" onAction="OnSummarize" size="large" imageMso="ReviewAcceptChange" screentip="智能摘要" supertip="使用 AI 对当前页面或分区内容进行摘要"/>
           <button id="btnGenerate" label="生成" onAction="OnGenerate" size="large" imageMso="FileNew" screentip="生成内容" supertip="根据提示词使用 AI 生成笔记内容"/>
-          <button id="btnTemplate" label="模板" onAction="OnTemplate" size="large" image="Template.png" screentip="模板生成" supertip="从预设模板（会议纪要、读书笔记、周报等）快速生成结构化内容"/>
+          <button id="btnTemplate" label="模板" onAction="OnTemplate" size="large" imageMso="PageTemplatesGallery" screentip="模板生成" supertip="从预设模板（会议纪要、读书笔记、周报等）快速生成结构化内容"/>
           <button id="btnRewrite" label="改写" onAction="OnRewrite" size="large" imageMso="TextEffectsMenu" screentip="智能改写" supertip="使用 AI 改写或润色当前页面的文本"/>
           <button id="btnQA" label="问答" onAction="OnQA" size="large" imageMso="ResearchPane" screentip="智能问答" supertip="基于当前页面或整个分区内容向 AI 提问，支持跨页检索和来源引用"/>
           <button id="btnTranslate" label="翻译" onAction="OnTranslate" size="large" imageMso="TranslateMenu" screentip="智能翻译" supertip="使用 AI 翻译选中文本或当前页面内容"/>
