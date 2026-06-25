@@ -6,6 +6,8 @@
 
 本插件不依赖 Microsoft Copilot 服务，通过接入 DeepSeek、OpenAI、Ollama 等 AI 服务（包括本地部署方案），为用户提供灵活、可控、无地域限制的 AI 笔记体验。
 
+![OneNote AI Assistant Demo](docs/demo.png)
+
 ## 功能一览
 
 | 功能 | 说明 |
