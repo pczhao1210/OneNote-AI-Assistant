@@ -39,7 +39,7 @@ namespace OneNoteAI.UI
 
         public ProgressOverlay(Form owner = null)
         {
-            Text = "AI 正在思考";
+            Text = Strings.IsChinese ? "AI 正在思考" : "AI Thinking";
             ClientSize = new Size(360, 130);
             FormBorderStyle = FormBorderStyle.FixedToolWindow;
             StartPosition = owner == null ? FormStartPosition.CenterScreen : FormStartPosition.CenterParent;
@@ -48,8 +48,8 @@ namespace OneNoteAI.UI
             MinimizeBox = false;
             TopMost = true;
             Opacity = 0.96;
-            BackColor = Color.FromArgb(245, 248, 252);
-            Font = new Font("Microsoft YaHei UI", 9F, FontStyle.Regular, GraphicsUnit.Point);
+            BackColor = Theme.BgPage;
+            Font = Theme.FontBase;
 
             if (owner != null)
             {
@@ -61,9 +61,9 @@ namespace OneNoteAI.UI
                 AutoSize = false,
                 Location = new Point(20, 14),
                 Size = new Size(320, 26),
-                Font = new Font("Microsoft YaHei UI", 11F, FontStyle.Bold, GraphicsUnit.Point),
-                ForeColor = Color.FromArgb(42, 52, 65),
-                Text = "AI 正在思考..."
+                Font = Theme.FontHeading,
+                ForeColor = Theme.Purple,
+                Text = Strings.ProgressAI
             };
 
             _lblThroughput = new Label
@@ -71,8 +71,8 @@ namespace OneNoteAI.UI
                 AutoSize = false,
                 Location = new Point(20, 42),
                 Size = new Size(320, 18),
-                Font = new Font("Microsoft YaHei UI", 9F, FontStyle.Regular, GraphicsUnit.Point),
-                ForeColor = Color.FromArgb(80, 110, 150),
+                Font = Theme.FontBase,
+                ForeColor = Theme.TextSecondary,
                 Text = string.Empty
             };
 
@@ -81,25 +81,14 @@ namespace OneNoteAI.UI
                 AutoSize = false,
                 Location = new Point(20, 62),
                 Size = new Size(320, 18),
-                ForeColor = Color.FromArgb(110, 118, 130),
-                Text = "可随时点击下方按钮取消"
+                ForeColor = Theme.TextMuted,
+                Text = Strings.IsChinese ? "可随时点击下方按钮取消" : "Click button below to cancel"
             };
 
-            // Larger, accent-colored cancel button so users always notice it.
-            _btnCancel = new Button
-            {
-                Text = "取消生成",
-                Size = new Size(150, 36),
-                Location = new Point(105, 86),
-                FlatStyle = FlatStyle.Flat,
-                Font = new Font("Microsoft YaHei UI", 10F, FontStyle.Bold, GraphicsUnit.Point),
-                BackColor = Color.FromArgb(220, 53, 69),
-                ForeColor = Color.White,
-                Cursor = Cursors.Hand
-            };
-            _btnCancel.FlatAppearance.BorderSize = 0;
-            _btnCancel.FlatAppearance.MouseOverBackColor = Color.FromArgb(200, 35, 51);
-            _btnCancel.FlatAppearance.MouseDownBackColor = Color.FromArgb(176, 30, 44);
+            _btnCancel = Theme.CreateDangerButton(Strings.ProgressCancel);
+            _btnCancel.Size = new Size(150, 36);
+            _btnCancel.Location = new Point(105, 86);
+            _btnCancel.Font = new Font("Microsoft YaHei UI", 10F, FontStyle.Bold, GraphicsUnit.Point);
             _btnCancel.Click += OnCancelClick;
 
             _animationTimer = new System.Windows.Forms.Timer { Interval = 450 };

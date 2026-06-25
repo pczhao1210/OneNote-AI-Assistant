@@ -38,19 +38,23 @@ namespace OneNoteAI.UI
 
         public SettingsDialog()
         {
-            Text = "OneNote AI Assistant 设置";
-            ClientSize = new Size(560, 520);
+            Text = "OneNote AI Assistant " + (Strings.IsChinese ? "设置" : "Settings");
+            ClientSize = new Size(580, 570);
             FormBorderStyle = FormBorderStyle.FixedDialog;
             StartPosition = FormStartPosition.CenterParent;
             MaximizeBox = false;
             MinimizeBox = false;
             ShowInTaskbar = false;
-            Font = new Font("Microsoft YaHei UI", 9F, FontStyle.Regular, GraphicsUnit.Point);
+            Theme.ApplyTo(this);
+
+            // ── Header ──
+            Panel header = Theme.CreateHeader(Strings.IsChinese ? "设置" : "Settings", 44);
+            Controls.Add(header);
 
             TabControl tabs = new TabControl
             {
-                Location = new Point(12, 12),
-                Size = new Size(536, 450)
+                Location = new Point(16, 56),
+                Size = new Size(548, 450)
             };
 
             // ── Tab 1: API + Model ─────────────────────────────────────
@@ -72,12 +76,9 @@ namespace OneNoteAI.UI
                 UseSystemPasswordChar = true
             };
 
-            _btnToggleApiKey = new Button
-            {
-                Text = "显示",
-                Location = new Point(418, 27),
-                Size = new Size(70, 26)
-            };
+            _btnToggleApiKey = Theme.CreateSecondaryButton(Strings.IsChinese ? "显示" : "Show");
+            _btnToggleApiKey.Location = new Point(418, 27);
+            _btnToggleApiKey.Size = new Size(70, 26);
             _btnToggleApiKey.Click += OnToggleApiKeyClick;
 
             Label lblApiBaseUrl = new Label { Text = "API 地址:", AutoSize = true, Location = new Point(16, 69) };
@@ -89,12 +90,9 @@ namespace OneNoteAI.UI
                 Text = "https://api.deepseek.com"
             };
 
-            _btnTestConnection = new Button
-            {
-                Text = "测试连接",
-                Location = new Point(388, 103),
-                Size = new Size(100, 28)
-            };
+            _btnTestConnection = Theme.CreateSecondaryButton(Strings.IsChinese ? "测试连接" : "Test");
+            _btnTestConnection.Location = new Point(388, 103);
+            _btnTestConnection.Size = new Size(100, 28);
             _btnTestConnection.Click += async (sender, args) => await TestConnectionAsync();
 
             grpApi.Controls.Add(lblApiKey);
@@ -198,22 +196,16 @@ namespace OneNoteAI.UI
             tabs.TabPages.Add(tabPrompts);
 
             // ── Footer buttons ──
-            _btnOk = new Button
-            {
-                Text = "确定",
-                Size = new Size(90, 30),
-                Location = new Point(362, 475),
-                DialogResult = DialogResult.None
-            };
+            _btnOk = Theme.CreatePrimaryButton(Strings.OK);
+            _btnOk.Size = new Size(96, 34);
+            _btnOk.Location = new Point(376, 518);
+            _btnOk.DialogResult = DialogResult.None;
             _btnOk.Click += OnOkClick;
 
-            _btnCancel = new Button
-            {
-                Text = "取消",
-                Size = new Size(90, 30),
-                Location = new Point(458, 475),
-                DialogResult = DialogResult.Cancel
-            };
+            _btnCancel = Theme.CreateSecondaryButton(Strings.Cancel);
+            _btnCancel.Size = new Size(96, 34);
+            _btnCancel.Location = new Point(480, 518);
+            _btnCancel.DialogResult = DialogResult.Cancel;
 
             Controls.Add(tabs);
             Controls.Add(_btnOk);
