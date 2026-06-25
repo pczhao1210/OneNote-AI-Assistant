@@ -90,9 +90,10 @@ namespace OneNoteAI.Features
                 "输入要头脑风暴的主题或问题...")
         };
 
-        private const string TemplateSystemPrompt =
-            "你是一个专业的内容生成助手。请严格按照指定的模板格式生成内容。" +
-            "内容要结构清晰、专业准确、有实用价值。使用中文输出。";
+        private static string TemplateSystemPrompt
+        {
+            get { return PromptTemplates.TemplateSystemPrompt; }
+        }
 
         public static async void Execute()
         {

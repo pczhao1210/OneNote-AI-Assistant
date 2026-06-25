@@ -131,25 +131,27 @@ namespace OneNoteAI.UI
 
         private void BuildTopicTree()
         {
-            TreeNode root = new TreeNode("快速入门") { Tag = "quickstart" };
+            bool zh = Strings.IsChinese;
+
+            TreeNode root = new TreeNode(zh ? "快速入门" : "Quick Start") { Tag = "quickstart" };
             _treeTopics.Nodes.Add(root);
 
-            TreeNode features = new TreeNode("功能说明");
-            features.Nodes.Add(new TreeNode("摘要") { Tag = "summarize" });
-            features.Nodes.Add(new TreeNode("生成") { Tag = "generate" });
-            features.Nodes.Add(new TreeNode("模板") { Tag = "template" });
-            features.Nodes.Add(new TreeNode("改写") { Tag = "rewrite" });
-            features.Nodes.Add(new TreeNode("问答") { Tag = "qa" });
-            features.Nodes.Add(new TreeNode("翻译") { Tag = "translate" });
-            features.Nodes.Add(new TreeNode("标签") { Tag = "tag" });
-            features.Nodes.Add(new TreeNode("提取待办") { Tag = "todos" });
+            TreeNode features = new TreeNode(zh ? "功能说明" : "Features");
+            features.Nodes.Add(new TreeNode(zh ? "摘要" : "Summary") { Tag = "summarize" });
+            features.Nodes.Add(new TreeNode(zh ? "生成" : "Generate") { Tag = "generate" });
+            features.Nodes.Add(new TreeNode(zh ? "模板" : "Template") { Tag = "template" });
+            features.Nodes.Add(new TreeNode(zh ? "改写" : "Rewrite") { Tag = "rewrite" });
+            features.Nodes.Add(new TreeNode(zh ? "问答" : "Q&A") { Tag = "qa" });
+            features.Nodes.Add(new TreeNode(zh ? "翻译" : "Translate") { Tag = "translate" });
+            features.Nodes.Add(new TreeNode(zh ? "标签" : "Tag") { Tag = "tag" });
+            features.Nodes.Add(new TreeNode(zh ? "提取待办" : "Todos") { Tag = "todos" });
             _treeTopics.Nodes.Add(features);
             features.Expand();
 
-            _treeTopics.Nodes.Add(new TreeNode("设置说明") { Tag = "settings" });
-            _treeTopics.Nodes.Add(new TreeNode("多模型支持") { Tag = "providers" });
-            _treeTopics.Nodes.Add(new TreeNode("常见问题") { Tag = "faq" });
-            _treeTopics.Nodes.Add(new TreeNode("关于") { Tag = "about" });
+            _treeTopics.Nodes.Add(new TreeNode(zh ? "设置说明" : "Settings") { Tag = "settings" });
+            _treeTopics.Nodes.Add(new TreeNode(zh ? "多模型支持" : "Providers") { Tag = "providers" });
+            _treeTopics.Nodes.Add(new TreeNode(zh ? "常见问题" : "FAQ") { Tag = "faq" });
+            _treeTopics.Nodes.Add(new TreeNode(zh ? "关于" : "About") { Tag = "about" });
         }
 
         private void OnTopicSelected(object sender, TreeViewEventArgs e)
@@ -166,7 +168,7 @@ namespace OneNoteAI.UI
         private void ShowTopic(string topic)
         {
             _rtbContent.Clear();
-            string content = GetTopicContent(topic);
+            string content = Strings.IsChinese ? GetTopicZh(topic) : GetTopicEn(topic);
             // Simple renderer: parse lines for basic formatting
             string[] lines = content.Split('\n');
             foreach (string line in lines)
@@ -203,7 +205,7 @@ namespace OneNoteAI.UI
             _rtbContent.AppendText(text);
         }
 
-        private static string GetTopicContent(string topic)
+        private static string GetTopicZh(string topic)
         {
             switch (topic)
             {
@@ -482,6 +484,216 @@ AI 自动分析页面内容，生成标签和分类。
 - 开发者：OneNote_MVP";
 
                 default: return "请从左侧目录选择一个主题。";
+            }
+        }
+
+        private static string GetTopicEn(string topic)
+        {
+            switch (topic)
+            {
+                case "quickstart": return
+@"# Quick Start
+
+Welcome to OneNote AI Assistant!
+
+## Step 1: Configure API Key
+- Click the Settings button in the Ribbon
+- Enter your DeepSeek API Key in API Settings
+- Click Test Connection to verify
+- Click OK to save
+
+## Step 2: Start Using
+- Open any OneNote page
+- Find the AI Assistant tab in the Ribbon
+- Choose a feature (Summary, Generate, Q&A, etc.)
+- Review the AI result in the dialog
+- Click Insert to add the result to your page
+
+## Tips
+- All features support Regenerate if you want a different result
+- Q&A supports multi-turn conversation (Follow-up button)
+- Translate and Rewrite auto-detect selected text";
+
+                case "summarize": return
+@"# Summary
+
+Generate AI summaries for the current page or entire section.
+
+## How to Use
+- Click the Summary button
+- Choose scope: Current Page or Entire Section
+- AI analyzes content and generates a structured summary
+
+## Output Format
+- Topic: one-line overview
+- Key Points: numbered list (3-7 items)
+- Conclusion: overall summary";
+
+                case "generate": return
+@"# Generate
+
+Create new content using AI based on your instructions.
+
+## How to Use
+- Click the Generate button
+- Enter your instruction (e.g., write a note about...)
+- AI references existing page content as context
+- Result can be inserted into the current page";
+
+                case "template": return
+@"# Template
+
+Quickly generate structured notes from preset templates.
+
+## Available Templates
+- Meeting Notes: Info → Discussion → Decisions → Action Items
+- Book Notes: Book Info → Key Ideas → Quotes → Reflections
+- Weekly Report: Completed → In Progress → Issues → Next Week
+- Study Notes: Concepts → Framework → Key Points → Practice
+- Project Plan: Overview → Milestones → Tasks → Risks
+- Brainstorming: Ideas → Extensions → Feasibility → Recommendations
+
+## How to Use
+- Click Template button → Select a template → Enter key info → AI expands";
+
+                case "rewrite": return
+@"# Rewrite
+
+Rewrite or polish text using AI.
+
+## How to Use
+- Select text in OneNote first (or it will rewrite the entire page)
+- Click the Rewrite button
+- Enter instructions (e.g., more formal, more concise)
+- Review and insert the result";
+
+                case "qa": return
+@"# Q&A
+
+Intelligent Q&A based on your notes, with cross-page search.
+
+## How to Use
+- Click the Q&A button
+- Choose scope: Current Page or Entire Section
+- Enter your question
+- AI answers based on note content with source citations
+
+## Cross-page Mode
+- AI reads all pages in the section
+- Answers include source: [Source: Page Name]
+- Automatic token budget management
+- Supports multi-turn follow-up questions";
+
+                case "translate": return
+@"# Translate
+
+Translate selected text or full page using AI.
+
+## Supported Languages
+- English, Chinese, Japanese, Korean
+- French, German, Spanish, Russian
+- Or enter any other language name";
+
+                case "tag": return
+@"# Auto Tag
+
+AI analyzes page content and generates tags and classification.
+
+## Output
+- Tags: 3-8 keyword tags in # format
+- Category: best-fit category
+- Topic: one-line summary";
+
+                case "todos": return
+@"# Extract Todos
+
+Smart todo extraction combining OneNote native tags and AI analysis.
+
+## How It Works (Two-step)
+- Step 1: Read OneNote native tags (checkboxes, etc.)
+  - Shows completed (check) and pending (box) items
+- Step 2: AI analyzes untagged text
+  - Finds hidden action items
+  - Strictly distinguishes info lists from real todos
+  - Does not duplicate tagged items
+
+## Security
+- API keys and passwords are automatically filtered
+- Sensitive content is never sent to AI";
+
+                case "settings": return
+@"# Settings
+
+## API Settings
+- API Key: your AI provider key (starts with sk-)
+- Base URL: default https://api.deepseek.com
+- Test Connection: verify your key
+
+## Model Settings
+- Auto-select model: picks best model based on content length
+- Temperature: 0.0-2.0 (higher = more creative)
+- Max Tokens: maximum generation length
+
+## Language
+- Auto: follows system language
+- Chinese / English: manual override";
+
+                case "providers": return
+@"# Multi-Provider Support
+
+## DeepSeek (Default)
+- URL: https://api.deepseek.com
+- Models: deepseek-chat, deepseek-reasoner
+
+## OpenAI
+- URL: https://api.openai.com/v1
+- Models: gpt-4o-mini, gpt-4o, etc.
+
+## Ollama (Local)
+- URL: http://localhost:11434/v1
+- No API key needed, fully local processing
+- Install Ollama first, then pull a model
+
+## Custom
+- Any OpenAI-compatible API endpoint";
+
+                case "faq": return
+@"# FAQ
+
+## Q: AI Assistant tab not showing in OneNote?
+- Close and reopen OneNote
+- Check File → Options → Add-ins
+
+## Q: API Key not configured error?
+- Click Settings and enter your key (starts with sk-)
+
+## Q: Generation is slow?
+- Check network connection
+- Reduce Max Tokens in settings
+
+## Q: How to use local models (offline)?
+- Install Ollama (ollama.com)
+- Run: ollama pull qwen2.5:7b
+- Set Base URL to http://localhost:11434/v1";
+
+                case "about": return
+@"# About OneNote AI Assistant
+
+Version: 2.0.0
+
+## Background
+
+Developed by OneNote MVP.
+
+Since OneNote Copilot is not available in certain regions, many users cannot benefit from AI-powered productivity features in their daily note-taking. To address this, we developed OneNote AI Assistant — a fully independent AI plugin that brings AI capabilities to all OneNote users worldwide.
+
+This plugin does not rely on Microsoft Copilot. It connects to DeepSeek, OpenAI, Ollama, or any OpenAI-compatible API, providing flexible, controllable, region-free AI note experiences.
+
+## Contact
+- GitHub: github.com/oldding/OneNote-AI-Assistant
+- Developer: OneNote_MVP";
+
+                default: return "Select a topic from the left panel.";
             }
         }
     }

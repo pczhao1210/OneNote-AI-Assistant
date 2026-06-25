@@ -19,23 +19,11 @@ namespace OneNoteAI.Features
     {
         /// <summary>
         /// System prompt for cross-page Q&A with citation support.
-        /// Instructs the AI to cite source page names in its answers.
         /// </summary>
-        private const string CrossPageQASystem =
-            "你是一个知识渊博的问答助手。用户提供了多个笔记页面的内容，每个页面以【页面：标题】开头。\n" +
-            "请严格按照以下格式回答：\n\n" +
-            "**回答：**\n\n" +
-            "（直接给出答案，使用编号或项目符号组织要点）\n\n" +
-            "**来源引用：**\n\n" +
-            "- [来源：页面标题1] — 引用的关键信息\n" +
-            "- [来源：页面标题2] — 引用的关键信息\n\n" +
-            "---\n" +
-            "要求：\n" +
-            "1. 回答应准确、有条理，使用编号列表\n" +
-            "2. **必须标注信息来源页面**\n" +
-            "3. 如果答案涉及多个页面，分别标注\n" +
-            "4. 如果笔记中没有相关信息，明确说明\n" +
-            "5. 不要输出无结构的长段落";
+        private static string CrossPageQASystem
+        {
+            get { return PromptTemplates.CrossPageQASystem; }
+        }
 
         public static async void Execute()
         {

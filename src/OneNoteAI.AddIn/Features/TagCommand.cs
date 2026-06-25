@@ -20,16 +20,10 @@ namespace OneNoteAI.Features
     /// </summary>
     public static class TagCommand
     {
-        private const string TagSystemPrompt =
-            "你是一个专业的笔记分类助手。请分析用户提供的笔记内容，生成以下信息：\n" +
-            "1. **标签**：3-8个关键词标签，用 # 号开头，空格分隔\n" +
-            "2. **分类**：归入一个最合适的类别（如：工作、学习、项目、会议、技术、生活、创意、研究等）\n" +
-            "3. **主题摘要**：一句话概括笔记主题（不超过30字）\n\n" +
-            "输出格式：\n" +
-            "标签：#标签1 #标签2 #标签3 ...\n" +
-            "分类：XXX\n" +
-            "主题：XXX\n\n" +
-            "要求：标签要具体有意义，能反映内容核心；分类要准确；主题要精炼。";
+        private static string TagSystemPrompt
+        {
+            get { return PromptTemplates.TagSystemPrompt; }
+        }
 
         public static async void Execute()
         {

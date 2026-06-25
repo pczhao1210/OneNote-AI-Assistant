@@ -45,10 +45,10 @@ namespace OneNoteAI.Features
             "Russian"
         };
 
-        private const string TranslateSystemPrompt =
-            "你是一个专业的翻译助手。请将用户提供的文本准确翻译为目标语言。" +
-            "翻译要求：1) 保持原文的语气和风格；2) 专业术语翻译准确；" +
-            "3) 译文自然流畅，符合目标语言的表达习惯；4) 只输出译文，不要添加解释。";
+        private static string TranslateSystemPrompt
+        {
+            get { return PromptTemplates.TranslateSystemPrompt; }
+        }
 
         public static async void Execute()
         {
