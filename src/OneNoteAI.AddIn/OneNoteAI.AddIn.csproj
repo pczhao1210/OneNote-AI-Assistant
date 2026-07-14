@@ -123,6 +123,9 @@
     <EmbeddedResource Include="Ribbon\Icons\ExtractTodos.png" />
     <EmbeddedResource Include="Ribbon\Icons\Settings.png" />
     <EmbeddedResource Include="Ribbon\Icons\Template.png" />
+    <EmbeddedResource Include="Ribbon\Icons\Translate.png" />
+    <EmbeddedResource Include="Ribbon\Icons\Tag.png" />
+    <EmbeddedResource Include="Ribbon\Icons\Help.png" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

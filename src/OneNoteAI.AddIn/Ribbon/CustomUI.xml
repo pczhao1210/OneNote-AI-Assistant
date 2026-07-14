@@ -1,22 +1,24 @@
-<customUI xmlns="http://schemas.microsoft.com/office/2009/07/customui" onLoad="OnRibbonLoad" loadImage="LoadImage">
+<customUI xmlns="http://schemas.microsoft.com/office/2009/07/customui" onLoad="OnRibbonLoad">
   <ribbon>
     <tabs>
       <tab id="tabOneNoteAI" getLabel="GetTabLabel" insertAfterMso="TabHome">
-        <group id="grpOneNoteAI" getLabel="GetGroupLabel">
-          <button id="btnSummarize" getLabel="GetLabel" onAction="OnSummarize" size="large" imageMso="ReviewAcceptChange" getScreentip="GetScreentip"/>
-          <button id="btnGenerate" getLabel="GetLabel" onAction="OnGenerate" size="large" imageMso="FileNew" getScreentip="GetScreentip"/>
-          <button id="btnTemplate" getLabel="GetLabel" onAction="OnTemplate" size="large" imageMso="PageTemplatesGallery" getScreentip="GetScreentip"/>
-          <button id="btnRewrite" getLabel="GetLabel" onAction="OnRewrite" size="large" imageMso="TextEffectsMenu" getScreentip="GetScreentip"/>
-          <button id="btnQA" getLabel="GetLabel" onAction="OnQA" size="large" imageMso="ResearchPane" getScreentip="GetScreentip"/>
-          <button id="btnTranslate" getLabel="GetLabel" onAction="OnTranslate" size="large" imageMso="TranslateMenu" getScreentip="GetScreentip"/>
-          <button id="btnTag" getLabel="GetLabel" onAction="OnTag" size="large" imageMso="CategorizeMenu" getScreentip="GetScreentip"/>
-          <button id="btnExtractTodos" getLabel="GetLabel" onAction="OnExtractTodos" size="large" imageMso="TaskAssign" getScreentip="GetScreentip"/>
-          <button id="btnSettings" getLabel="GetLabel" onAction="OnSettings" size="large" imageMso="ControlProperties" getScreentip="GetScreentip"/>
-          <button id="btnHelp" getLabel="GetLabel" onAction="OnHelp" size="large" imageMso="Help" getScreentip="GetScreentip"/>
+        <group id="grpCreate" getLabel="GetGroupLabel">
+          <button id="btnSummarize" getLabel="GetLabel" onAction="OnSummarize" size="large" getImage="GetImage" getScreentip="GetScreentip"/>
+          <button id="btnGenerate" getLabel="GetLabel" onAction="OnGenerate" size="large" getImage="GetImage" getScreentip="GetScreentip"/>
+          <button id="btnRewrite" getLabel="GetLabel" onAction="OnRewrite" size="large" getImage="GetImage" getScreentip="GetScreentip"/>
+          <button id="btnTranslate" getLabel="GetLabel" onAction="OnTranslate" size="large" getImage="GetImage" getScreentip="GetScreentip"/>
+          <button id="btnQA" getLabel="GetLabel" onAction="OnQA" size="large" getImage="GetImage" getScreentip="GetScreentip"/>
+        </group>
+        <group id="grpOrganize" getLabel="GetGroupLabel">
+          <button id="btnTemplate" getLabel="GetLabel" onAction="OnTemplate" size="large" getImage="GetImage" getScreentip="GetScreentip"/>
+          <button id="btnTag" getLabel="GetLabel" onAction="OnTag" size="large" getImage="GetImage" getScreentip="GetScreentip"/>
+          <button id="btnExtractTodos" getLabel="GetLabel" onAction="OnExtractTodos" size="large" getImage="GetImage" getScreentip="GetScreentip"/>
+        </group>
+        <group id="grpPlugin" getLabel="GetGroupLabel">
+          <button id="btnSettings" getLabel="GetLabel" onAction="OnSettings" size="large" getImage="GetImage" getScreentip="GetScreentip"/>
+          <button id="btnHelp" getLabel="GetLabel" onAction="OnHelp" size="large" getImage="GetImage" getScreentip="GetScreentip"/>
         </group>
       </tab>
     </tabs>
   </ribbon>
 </customUI>
-
-

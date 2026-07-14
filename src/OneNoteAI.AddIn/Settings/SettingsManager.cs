@@ -13,7 +13,26 @@ namespace OneNoteAI.Settings
         DeepSeek = 0,
         OpenAI = 1,
         Ollama = 2,
-        Custom = 3
+        Custom = 3,
+        Qwen = 4,
+        Zhipu = 5,
+        Moonshot = 6,
+        MiniMax = 7,
+        Gemini = 8,
+        Claude = 9,
+        OpenRouter = 10
+    }
+
+    public class ProviderSettings
+    {
+        [JsonProperty("apiKey")]
+        public string ApiKey { get; set; }
+
+        [JsonProperty("apiBaseUrl")]
+        public string ApiBaseUrl { get; set; }
+
+        [JsonProperty("defaultModel")]
+        public string DefaultModel { get; set; }
     }
 
     public class AppSettings
@@ -45,6 +64,12 @@ namespace OneNoteAI.Settings
         [JsonProperty("promptOverrides")]
         public PromptOverrides PromptOverrides { get; set; } = new PromptOverrides();
 
+        // Each provider keeps its own encrypted key and last-used endpoint/model.
+        // The three legacy fields above mirror the active entry for backward compatibility.
+        [JsonProperty("providerSettings")]
+        public System.Collections.Generic.Dictionary<AiProvider, ProviderSettings> ProviderSettings { get; set; }
+            = new System.Collections.Generic.Dictionary<AiProvider, ProviderSettings>();
+
         /// <summary>
         /// Returns the effective API base URL based on the selected provider.
         /// If the user has set a custom URL, it takes precedence.
@@ -60,8 +85,22 @@ namespace OneNoteAI.Settings
             {
                 case AiProvider.OpenAI:
                     return "https://api.openai.com/v1";
+                case AiProvider.Qwen:
+                    return "https://dashscope.aliyuncs.com/compatible-mode/v1";
+                case AiProvider.Zhipu:
+                    return "https://open.bigmodel.cn/api/paas/v4";
+                case AiProvider.Moonshot:
+                    return "https://api.moonshot.cn/v1";
+                case AiProvider.MiniMax:
+                    return "https://api.minimax.chat/v1";
+                case AiProvider.Gemini:
+                    return "https://generativelanguage.googleapis.com/v1beta/openai";
+                case AiProvider.Claude:
+                    return "https://api.anthropic.com";
                 case AiProvider.Ollama:
                     return "http://localhost:11434/v1";
+                case AiProvider.OpenRouter:
+                    return "https://openrouter.ai/api/v1";
                 case AiProvider.DeepSeek:
                 default:
                     return "https://api.deepseek.com";
@@ -76,9 +115,23 @@ namespace OneNoteAI.Settings
             switch (Provider)
             {
                 case AiProvider.OpenAI:
-                    return "gpt-4o-mini";
+                    return "gpt-4.1-mini";
+                case AiProvider.Qwen:
+                    return "qwen-plus";
+                case AiProvider.Zhipu:
+                    return "glm-4.5-air";
+                case AiProvider.Moonshot:
+                    return "moonshot-v1-8k";
+                case AiProvider.MiniMax:
+                    return "MiniMax-Text-01";
+                case AiProvider.Gemini:
+                    return "gemini-2.5-flash";
+                case AiProvider.Claude:
+                    return "claude-sonnet-4-20250514";
                 case AiProvider.Ollama:
                     return "qwen2.5:7b";
+                case AiProvider.OpenRouter:
+                    return "openai/gpt-4.1-mini";
                 case AiProvider.DeepSeek:
                 default:
                     return "deepseek-chat";
@@ -201,7 +254,50 @@ namespace OneNoteAI.Settings
         public static void SetApiKey(string plainKey)
         {
             Current.ApiKey = EncryptionHelper.Encrypt(plainKey);
+            ProviderSettings profile = GetActiveProviderSettings();
+            profile.ApiKey = Current.ApiKey;
             Save();
+        }
+
+        public static ProviderSettings GetActiveProviderSettings()
+        {
+            AppSettings settings = Current;
+            if (settings.ProviderSettings == null)
+            {
+                settings.ProviderSettings = new System.Collections.Generic.Dictionary<AiProvider, ProviderSettings>();
+            }
+            ProviderSettings profile;
+            if (!settings.ProviderSettings.TryGetValue(settings.Provider, out profile) || profile == null)
+            {
+                profile = new ProviderSettings
+                {
+                    ApiKey = settings.ApiKey,
+                    ApiBaseUrl = settings.ApiBaseUrl,
+                    DefaultModel = settings.DefaultModel
+                };
+                settings.ProviderSettings[settings.Provider] = profile;
+            }
+            return profile;
+        }
+
+        public static void SwitchProvider(AiProvider provider)
+        {
+            AppSettings settings = Current;
+            ProviderSettings oldProfile = GetActiveProviderSettings();
+            oldProfile.ApiKey = settings.ApiKey;
+            oldProfile.ApiBaseUrl = settings.ApiBaseUrl;
+            oldProfile.DefaultModel = settings.DefaultModel;
+
+            settings.Provider = provider;
+            ProviderSettings profile;
+            if (!settings.ProviderSettings.TryGetValue(provider, out profile) || profile == null)
+            {
+                profile = new ProviderSettings();
+                settings.ProviderSettings[provider] = profile;
+            }
+            settings.ApiKey = profile.ApiKey;
+            settings.ApiBaseUrl = string.IsNullOrWhiteSpace(profile.ApiBaseUrl) ? settings.GetEffectiveBaseUrl() : profile.ApiBaseUrl;
+            settings.DefaultModel = string.IsNullOrWhiteSpace(profile.DefaultModel) ? settings.GetDefaultModelForProvider() : profile.DefaultModel;
         }
 
         /// <summary>
@@ -209,7 +305,7 @@ namespace OneNoteAI.Settings
         /// </summary>
         public static bool HasApiKey()
         {
-            return !string.IsNullOrEmpty(GetApiKey());
+            return Current.Provider == AiProvider.Ollama || !string.IsNullOrEmpty(GetApiKey());
         }
 
         private static AppSettings CreateDefaultSettings()
@@ -253,6 +349,11 @@ namespace OneNoteAI.Settings
             {
                 settings.PromptOverrides = new PromptOverrides();
             }
+
+            ProviderSettings profile = GetActiveProviderSettings();
+            profile.ApiKey = settings.ApiKey;
+            profile.ApiBaseUrl = settings.ApiBaseUrl;
+            profile.DefaultModel = settings.DefaultModel;
         }
     }
 }

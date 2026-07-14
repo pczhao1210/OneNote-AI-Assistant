@@ -15,6 +15,7 @@ namespace OneNoteAI.UI
     {
         // API + Model tab
         private readonly TextBox _txtApiKey;
+        private readonly ComboBox _cmbProvider;
         private readonly Button _btnToggleApiKey;
         private readonly TextBox _txtApiBaseUrl;
         private readonly Button _btnTestConnection;
@@ -35,6 +36,14 @@ namespace OneNoteAI.UI
         private readonly Button _btnCancel;
 
         private bool _showApiKey;
+
+        private sealed class ProviderListItem
+        {
+            public AiProvider Provider { get; private set; }
+            private readonly string _name;
+            public ProviderListItem(AiProvider provider, string name) { Provider = provider; _name = name; }
+            public override string ToString() { return _name; }
+        }
 
         public SettingsDialog()
         {
@@ -64,20 +73,27 @@ namespace OneNoteAI.UI
             {
                 Text = "API 设置",
                 Location = new Point(10, 10),
-                Size = new Size(510, 145)
+                Size = new Size(510, 180)
             };
+
+            Label lblProvider = new Label { Text = "Provider:", AutoSize = true, Location = new Point(16, 32) };
+            _cmbProvider = new ComboBox { Location = new Point(90, 28), Size = new Size(200, 23), DropDownStyle = ComboBoxStyle.DropDownList };
+            foreach (AiProvider provider in Enum.GetValues(typeof(AiProvider)))
+                _cmbProvider.Items.Add(new ProviderListItem(provider, GetProviderDisplayName(provider)));
+            _cmbProvider.SelectedIndexChanged += OnProviderChanged;
 
             Label lblApiKey = new Label { Text = "API 密钥:", AutoSize = true, Location = new Point(16, 32) };
 
             _txtApiKey = new TextBox
             {
-                Location = new Point(90, 28),
+                Location = new Point(90, 65),
                 Size = new Size(320, 23),
                 UseSystemPasswordChar = true
             };
+            lblApiKey.Location = new Point(16, 69);
 
             _btnToggleApiKey = Theme.CreateSecondaryButton(Strings.IsChinese ? "显示" : "Show");
-            _btnToggleApiKey.Location = new Point(418, 27);
+            _btnToggleApiKey.Location = new Point(418, 64);
             _btnToggleApiKey.Size = new Size(70, 26);
             _btnToggleApiKey.Click += OnToggleApiKeyClick;
 
@@ -85,16 +101,19 @@ namespace OneNoteAI.UI
 
             _txtApiBaseUrl = new TextBox
             {
-                Location = new Point(90, 65),
+                Location = new Point(90, 102),
                 Size = new Size(398, 23),
                 Text = "https://api.deepseek.com"
             };
+            lblApiBaseUrl.Location = new Point(16, 106);
 
             _btnTestConnection = Theme.CreateSecondaryButton(Strings.IsChinese ? "测试连接" : "Test");
-            _btnTestConnection.Location = new Point(388, 103);
+            _btnTestConnection.Location = new Point(388, 140);
             _btnTestConnection.Size = new Size(100, 28);
             _btnTestConnection.Click += async (sender, args) => await TestConnectionAsync();
 
+            grpApi.Controls.Add(lblProvider);
+            grpApi.Controls.Add(_cmbProvider);
             grpApi.Controls.Add(lblApiKey);
             grpApi.Controls.Add(_txtApiKey);
             grpApi.Controls.Add(_btnToggleApiKey);
@@ -105,7 +124,7 @@ namespace OneNoteAI.UI
             GroupBox grpModel = new GroupBox
             {
                 Text = "模型设置",
-                Location = new Point(10, 165),
+                Location = new Point(10, 200),
                 Size = new Size(510, 155)
             };
 
@@ -123,7 +142,7 @@ namespace OneNoteAI.UI
             {
                 Location = new Point(90, 62),
                 Size = new Size(180, 23),
-                DropDownStyle = ComboBoxStyle.DropDownList
+                DropDownStyle = ComboBoxStyle.DropDown
             };
             _cmbDefaultModel.Items.Add("deepseek-chat");
             _cmbDefaultModel.Items.Add("deepseek-reasoner");
@@ -206,6 +225,7 @@ namespace OneNoteAI.UI
             _btnCancel.Size = new Size(96, 34);
             _btnCancel.Location = new Point(480, 518);
             _btnCancel.DialogResult = DialogResult.Cancel;
+            _btnCancel.Click += delegate { SettingsManager.Load(); };
 
             Controls.Add(tabs);
             Controls.Add(_btnOk);
@@ -215,6 +235,10 @@ namespace OneNoteAI.UI
             CancelButton = _btnCancel;
 
             Load += OnDialogLoad;
+            FormClosing += delegate(object sender, FormClosingEventArgs e)
+            {
+                if (DialogResult != DialogResult.OK) SettingsManager.Load();
+            };
         }
 
         /// <summary>
@@ -268,19 +292,14 @@ namespace OneNoteAI.UI
         private void OnDialogLoad(object sender, EventArgs e)
         {
             AppSettings settings = SettingsManager.Current;
+            SelectProvider(settings.Provider);
 
             _txtApiKey.Text = SettingsManager.GetApiKey();
             _txtApiBaseUrl.Text = settings.ApiBaseUrl ?? "https://api.deepseek.com";
             _chkAutoSelectModel.Checked = settings.AutoSelectModel;
 
-            if (!string.IsNullOrWhiteSpace(settings.DefaultModel) && _cmbDefaultModel.Items.Contains(settings.DefaultModel))
-            {
-                _cmbDefaultModel.SelectedItem = settings.DefaultModel;
-            }
-            else
-            {
-                _cmbDefaultModel.SelectedItem = "deepseek-chat";
-            }
+            AddRecommendedModels(settings.Provider);
+            _cmbDefaultModel.Text = string.IsNullOrWhiteSpace(settings.DefaultModel) ? settings.GetDefaultModelForProvider() : settings.DefaultModel;
 
             decimal temperature = Convert.ToDecimal(settings.Temperature);
             if (temperature < _numTemperature.Minimum || temperature > _numTemperature.Maximum)
@@ -318,7 +337,7 @@ namespace OneNoteAI.UI
         {
             string apiBaseUrl = (_txtApiBaseUrl.Text ?? string.Empty).Trim();
             string apiKey = (_txtApiKey.Text ?? string.Empty).Trim();
-            string defaultModel = _cmbDefaultModel.SelectedItem as string;
+            string defaultModel = (_cmbDefaultModel.Text ?? string.Empty).Trim();
 
             if (string.IsNullOrWhiteSpace(apiBaseUrl))
             {
@@ -348,6 +367,8 @@ namespace OneNoteAI.UI
             settings.Temperature = Convert.ToDouble(_numTemperature.Value);
             settings.MaxTokens = Decimal.ToInt32(_numMaxTokens.Value);
             settings.Language = "zh-CN";
+            SettingsManager.GetActiveProviderSettings().ApiBaseUrl = apiBaseUrl;
+            SettingsManager.GetActiveProviderSettings().DefaultModel = defaultModel;
 
             if (settings.PromptOverrides == null) settings.PromptOverrides = new PromptOverrides();
             // Only persist as an override if it differs from the built-in default
@@ -376,9 +397,9 @@ namespace OneNoteAI.UI
         {
             string apiKey = (_txtApiKey.Text ?? string.Empty).Trim();
             string apiBaseUrl = (_txtApiBaseUrl.Text ?? string.Empty).Trim();
-            string model = _cmbDefaultModel.SelectedItem as string;
+            string model = (_cmbDefaultModel.Text ?? string.Empty).Trim();
 
-            if (string.IsNullOrWhiteSpace(apiKey))
+            if (string.IsNullOrWhiteSpace(apiKey) && SettingsManager.Current.Provider != AiProvider.Ollama)
             {
                 MessageBox.Show("请先输入 API Key。", "OneNote AI Assistant", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 _txtApiKey.Focus();
@@ -395,6 +416,61 @@ namespace OneNoteAI.UI
             if (string.IsNullOrWhiteSpace(model))
             {
                 model = "deepseek-chat";
+            }
+
+            _btnTestConnection.Enabled = false;
+            try
+            {
+                using (DeepseekClient client = new DeepseekClient(apiKey, apiBaseUrl))
+                {
+                    await client.SendAsync(new OneNoteAI.AI.Models.ChatRequest
+                    {
+                        Model = model,
+                        MaxTokens = 5,
+                        Temperature = 0.0,
+                        Messages = new System.Collections.Generic.List<OneNoteAI.AI.Models.ChatMessage>
+                        {
+                            OneNoteAI.AI.Models.ChatMessage.User("Hi")
+                        }
+                    });
+                }
+                MessageBox.Show("Connection test succeeded.", "OneNote AI Assistant", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Connection test failed: " + ex.Message, "OneNote AI Assistant", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            finally
+            {
+                _btnTestConnection.Enabled = true;
+            }
+            return;
+
+#pragma warning disable 162
+            if (SettingsManager.Current.Provider == AiProvider.Claude)
+            {
+                try
+                {
+                    using (DeepseekClient client = new DeepseekClient(apiKey, apiBaseUrl))
+                    {
+                        await client.SendAsync(new OneNoteAI.AI.Models.ChatRequest
+                        {
+                            Model = model,
+                            MaxTokens = 5,
+                            Temperature = 0.0,
+                            Messages = new System.Collections.Generic.List<OneNoteAI.AI.Models.ChatMessage>
+                            {
+                                OneNoteAI.AI.Models.ChatMessage.User("Hi")
+                            }
+                        });
+                    }
+                    MessageBox.Show("Connection test succeeded.", "OneNote AI Assistant", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show("Connection test failed: " + ex.Message, "OneNote AI Assistant", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+                return;
             }
 
             _btnTestConnection.Enabled = false;
@@ -446,6 +522,86 @@ namespace OneNoteAI.UI
             finally
             {
                 _btnTestConnection.Enabled = true;
+            }
+        }
+#pragma warning restore 162
+
+        private void OnProviderChanged(object sender, EventArgs e)
+        {
+            ProviderListItem selected = _cmbProvider.SelectedItem as ProviderListItem;
+            if (!IsHandleCreated || selected == null) return;
+            AiProvider provider = selected.Provider;
+            if (provider == SettingsManager.Current.Provider) return;
+            PersistActiveProviderDraft();
+            SettingsManager.SwitchProvider(provider);
+            AppSettings settings = SettingsManager.Current;
+            _txtApiKey.Text = SettingsManager.GetApiKey();
+            _txtApiBaseUrl.Text = settings.ApiBaseUrl;
+            AddRecommendedModels(provider);
+            _cmbDefaultModel.Text = settings.DefaultModel;
+        }
+
+        private void AddRecommendedModels(AiProvider provider)
+        {
+            _cmbDefaultModel.Items.Clear();
+            switch (provider)
+            {
+                case AiProvider.DeepSeek: _cmbDefaultModel.Items.AddRange(new object[] { "deepseek-chat", "deepseek-reasoner" }); break;
+                case AiProvider.OpenAI: _cmbDefaultModel.Items.AddRange(new object[] { "gpt-4.1-mini", "gpt-4.1", "gpt-4o-mini" }); break;
+                case AiProvider.Qwen: _cmbDefaultModel.Items.AddRange(new object[] { "qwen-plus", "qwen-turbo", "qwen-max" }); break;
+                case AiProvider.Zhipu: _cmbDefaultModel.Items.AddRange(new object[] { "glm-4.5-air", "glm-4.5" }); break;
+                case AiProvider.Moonshot: _cmbDefaultModel.Items.Add("moonshot-v1-8k"); break;
+                case AiProvider.MiniMax: _cmbDefaultModel.Items.Add("MiniMax-Text-01"); break;
+                case AiProvider.Gemini: _cmbDefaultModel.Items.AddRange(new object[] { "gemini-2.5-flash", "gemini-2.5-pro" }); break;
+                case AiProvider.Claude: _cmbDefaultModel.Items.AddRange(new object[] { "claude-sonnet-4-20250514", "claude-opus-4-20250514" }); break;
+                case AiProvider.Ollama: _cmbDefaultModel.Items.AddRange(new object[] { "qwen2.5:7b", "llama3.1:8b" }); break;
+                case AiProvider.OpenRouter: _cmbDefaultModel.Items.Add("openai/gpt-4.1-mini"); break;
+            }
+        }
+
+        private void PersistActiveProviderDraft()
+        {
+            AppSettings settings = SettingsManager.Current;
+            string plainKey = (_txtApiKey.Text ?? string.Empty).Trim();
+            settings.ApiKey = EncryptionHelper.Encrypt(plainKey);
+            settings.ApiBaseUrl = (_txtApiBaseUrl.Text ?? string.Empty).Trim();
+            settings.DefaultModel = (_cmbDefaultModel.Text ?? string.Empty).Trim();
+            ProviderSettings profile = SettingsManager.GetActiveProviderSettings();
+            profile.ApiKey = settings.ApiKey;
+            profile.ApiBaseUrl = settings.ApiBaseUrl;
+            profile.DefaultModel = settings.DefaultModel;
+        }
+
+        private void SelectProvider(AiProvider provider)
+        {
+            foreach (object item in _cmbProvider.Items)
+            {
+                ProviderListItem candidate = item as ProviderListItem;
+                if (candidate != null && candidate.Provider == provider)
+                {
+                    _cmbProvider.SelectedItem = candidate;
+                    return;
+                }
+            }
+        }
+
+        private static string GetProviderDisplayName(AiProvider provider)
+        {
+            if (!Strings.IsChinese) return provider.ToString();
+            switch (provider)
+            {
+                case AiProvider.DeepSeek: return "DeepSeek（深度求索）";
+                case AiProvider.OpenAI: return "OpenAI";
+                case AiProvider.Qwen: return "通义千问（Qwen）";
+                case AiProvider.Zhipu: return "智谱 GLM";
+                case AiProvider.Moonshot: return "Kimi（月之暗面）";
+                case AiProvider.MiniMax: return "MiniMax";
+                case AiProvider.Gemini: return "Google Gemini";
+                case AiProvider.Claude: return "Anthropic Claude";
+                case AiProvider.Ollama: return "Ollama（本地模型）";
+                case AiProvider.OpenRouter: return "OpenRouter";
+                case AiProvider.Custom: return "自定义兼容接口";
+                default: return provider.ToString();
             }
         }
     }

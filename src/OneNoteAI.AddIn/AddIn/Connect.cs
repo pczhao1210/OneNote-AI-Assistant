@@ -232,7 +232,14 @@ namespace OneNoteAI.AddIn
 
         public string GetGroupLabel(IRibbonControl control)
         {
-            return Strings.RibbonGroup;
+            bool zh = Strings.IsChinese;
+            switch (control.Id)
+            {
+                case "grpCreate": return zh ? "AI 创作" : "AI Create";
+                case "grpOrganize": return zh ? "笔记整理" : "Organize";
+                case "grpPlugin": return zh ? "插件" : "Plugin";
+                default: return Strings.RibbonGroup;
+            }
         }
 
         public string GetLabel(IRibbonControl control)
@@ -269,6 +276,71 @@ namespace OneNoteAI.AddIn
                 case "btnSettings": return zh ? "插件设置" : "Settings";
                 case "btnHelp": return zh ? "使用帮助" : "Help";
                 default: return "";
+            }
+        }
+
+        /// <summary>
+        /// OneNote requires a COM IStream for Ribbon images. Returning an
+        /// IPictureDisp (the Word/Excel pattern) results in blank icons.
+        /// This per-control callback follows the implementation proven by
+        /// JianZheng/OneMore and maps each control to an embedded PNG.
+        /// </summary>
+        public System.Runtime.InteropServices.ComTypes.IStream GetImage(IRibbonControl control)
+        {
+            try
+            {
+                string iconName = MapControlToIcon(control == null ? null : control.Id);
+                if (string.IsNullOrEmpty(iconName)) return null;
+
+                string resourceName = "OneNoteAI.Ribbon.Icons." + iconName + ".png";
+                using (Stream stream = Assembly.GetExecutingAssembly().GetManifestResourceStream(resourceName))
+                {
+                    if (stream == null)
+                    {
+                        Logger.Warn("Ribbon icon resource missing: " + resourceName);
+                        return null;
+                    }
+
+                    byte[] bytes = new byte[stream.Length];
+                    int offset = 0;
+                    while (offset < bytes.Length)
+                    {
+                        int read = stream.Read(bytes, offset, bytes.Length - offset);
+                        if (read <= 0) break;
+                        offset += read;
+                    }
+
+                    Logger.Info("Ribbon icon loaded: " + control.Id + " -> " + resourceName);
+                    return SHCreateMemStream(bytes, (uint)offset);
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("GetImage failed for '" + (control == null ? "<null>" : control.Id) + "'", ex);
+                return null;
+            }
+        }
+
+        [DllImport("shlwapi.dll")]
+        private static extern System.Runtime.InteropServices.ComTypes.IStream SHCreateMemStream(
+            [MarshalAs(UnmanagedType.LPArray, SizeParamIndex = 1)] byte[] pInit,
+            uint cbInit);
+
+        private static string MapControlToIcon(string controlId)
+        {
+            switch (controlId)
+            {
+                case "btnSummarize": return "Summarize";
+                case "btnGenerate": return "Generate";
+                case "btnTemplate": return "Template";
+                case "btnRewrite": return "Rewrite";
+                case "btnQA": return "QA";
+                case "btnTranslate": return "Translate";
+                case "btnTag": return "Tag";
+                case "btnExtractTodos": return "ExtractTodos";
+                case "btnSettings": return "Settings";
+                case "btnHelp": return "Help";
+                default: return null;
             }
         }
 
