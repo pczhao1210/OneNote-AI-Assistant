@@ -137,6 +137,42 @@ namespace OneNoteAI.Settings
                     return "deepseek-chat";
             }
         }
+
+        /// <summary>
+        /// Returns the token context window for the active provider/model.
+        /// Callers size their input budget from this so larger models can
+        /// consume more page content than smaller ones.
+        /// </summary>
+        public int GetContextWindow()
+        {
+            string model = (DefaultModel ?? string.Empty).ToLowerInvariant();
+            switch (Provider)
+            {
+                case AiProvider.OpenAI:
+                    return 128000;
+                case AiProvider.Qwen:
+                    return 131072;
+                case AiProvider.Zhipu:
+                    return 131072;
+                case AiProvider.Moonshot:
+                    if (model.Contains("8k")) return 8192;
+                    if (model.Contains("32k")) return 32768;
+                    return 131072;
+                case AiProvider.MiniMax:
+                    return 1000000;
+                case AiProvider.Gemini:
+                    return 1000000;
+                case AiProvider.Claude:
+                    return 200000;
+                case AiProvider.Ollama:
+                    return 32768;
+                case AiProvider.OpenRouter:
+                    return 128000;
+                case AiProvider.DeepSeek:
+                default:
+                    return 64000;
+            }
+        }
     }
 
     /// <summary>

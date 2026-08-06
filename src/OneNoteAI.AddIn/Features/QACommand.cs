@@ -279,16 +279,22 @@ namespace OneNoteAI.Features
             {
                 progress = ProgressOverlay.Show(null);
 
-                // ── Gather all page content with titles (token-budget aware) ──
-                progress.UpdateStatus("正在读取分区页面...");
+                // ── Determine query kind: metadata (titles/count) vs content ──
+                bool metadataOnly = IsMetadataQuery(question);
+
+                // ── Gather page content or just titles (token-budget aware) ──
+                progress.UpdateStatus(metadataOnly ? "正在收集页面标题..." : "正在读取分区页面...");
                 StringBuilder contextBuilder = new StringBuilder();
                 int loadedPages = 0;
 
                 // Token budget: reserve tokens for system prompt, question, and response.
-                // DeepSeek context window is ~32k tokens; we use ~20k for page content.
-                const int MaxContextTokens = 20000;
+                // Dynamically sized from the active model's context window so
+                // larger models (GPT-4.1 128k, Claude 200k, Gemini 1M) can
+                // read many more pages than DeepSeek's 64k.
                 const int SystemOverhead = 1500; // system prompt + question + formatting
-                int remainingBudget = MaxContextTokens - SystemOverhead;
+                int contextWindow = settings.GetContextWindow();
+                int remainingBudget = contextWindow - SystemOverhead - settings.MaxTokens;
+                if (remainingBudget < 8000) remainingBudget = 8000; // sanity floor for tiny windows
 
                 // First pass: read all pages and estimate tokens
                 List<(string Title, string Text, int Tokens)> pageData = new List<(string, string, int)>();
@@ -296,23 +302,33 @@ namespace OneNoteAI.Features
                 {
                     progress.Token.ThrowIfCancellationRequested();
                     var entry = sectionPages[i];
-                    progress.UpdateStatus(string.Format("读取页面 {0}/{1}：{2}",
+                    progress.UpdateStatus(string.Format(metadataOnly ? "收集标题 {0}/{1}：{2}" : "读取页面 {0}/{1}：{2}",
                         i + 1, sectionPages.Count, Truncate(entry.Title, 20)));
 
                     string pageText;
-                    try
+                    if (metadataOnly)
                     {
-                        pageText = provider.GetPage(entry.PageId).GetPlainText();
+                        // Metadata queries (page count / title list) only need
+                        // the titles we already fetched in GetSectionPages();
+                        // skip reading every page's body content entirely.
+                        pageText = entry.Title;
                     }
-                    catch (Exception readEx)
+                    else
                     {
-                        Logger.Error("读取页面失败: " + entry.Title, readEx);
-                        continue;
-                    }
+                        try
+                        {
+                            pageText = provider.GetPage(entry.PageId).GetPlainText();
+                        }
+                        catch (Exception readEx)
+                        {
+                            Logger.Error("读取页面失败: " + entry.Title, readEx);
+                            continue;
+                        }
 
-                    if (string.IsNullOrWhiteSpace(pageText))
-                    {
-                        continue;
+                        if (string.IsNullOrWhiteSpace(pageText))
+                        {
+                            continue;
+                        }
                     }
 
                     int pageTokens = TokenEstimator.Estimate(pageText);
@@ -354,7 +370,9 @@ namespace OneNoteAI.Features
                     int usedTokens = TokenEstimator.Estimate(truncatedText);
                     remainingBudget -= usedTokens;
 
-                    contextBuilder.AppendFormat("\n\n【页面：{0}】\n{1}", pd.Title, truncatedText);
+                    contextBuilder.AppendFormat(metadataOnly
+                        ? "{0}. {1}"
+                        : "\n\n【页面：{0}】\n{1}", pd.Title, truncatedText);
                     loadedPages++;
                 }
 
@@ -372,7 +390,9 @@ namespace OneNoteAI.Features
                 {
                     ChatMessage.System(CrossPageQASystem),
                     ChatMessage.User(string.Format(
-                        "以下是分区「{0}」中 {1} 个页面的笔记内容：\n{2}\n\n---\n\n我的问题是：{3}",
+                        metadataOnly
+                            ? "以下是分区「{0}」中 {1} 个页面的标题列表：\n{2}\n\n---\n\n我的问题是：{3}\n\n请基于上面的标题列表如实回答。若问题要求列出所有标题，请全部列出，不要省略。"
+                            : "以下是分区「{0}」中 {1} 个页面的笔记内容：\n{2}\n\n---\n\n我的问题是：{3}",
                         sectionName, loadedPages, allContent, question))
                 };
 
@@ -513,6 +533,43 @@ namespace OneNoteAI.Features
         }
 
         // ── Helpers ──────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Detects metadata-only questions that only need page titles/counts
+        /// (e.g. "这个分区有多少页？", "列出所有页面标题"). For these we skip
+        /// reading every page's body content, which is dramatically faster and
+        /// lets ALL titles fit in the context window regardless of model size.
+        /// </summary>
+        private static bool IsMetadataQuery(string question)
+        {
+            if (string.IsNullOrWhiteSpace(question)) return false;
+
+            string q = question.Trim();
+            string[] chineseKeywords =
+            {
+                "多少页", "几个页面", "多少个页面", "页面标题", "所有标题", "标题列表",
+                "列出", "列举", "有哪些页面", "有哪些页", "全部页面", "所有页面",
+                "统计", "标题", "索引", "目录", "清单"
+            };
+            foreach (string kw in chineseKeywords)
+            {
+                if (q.IndexOf(kw, StringComparison.Ordinal) >= 0) return true;
+            }
+
+            string ql = q.ToLowerInvariant();
+            string[] englishKeywords =
+            {
+                "how many pages", "list of pages", "list all pages", "page titles",
+                "all titles", "list of titles", "titles of", "page count",
+                "index of", "table of contents", "overview"
+            };
+            foreach (string kw in englishKeywords)
+            {
+                if (ql.IndexOf(kw, StringComparison.Ordinal) >= 0) return true;
+            }
+
+            return false;
+        }
 
         /// <summary>
         /// Truncates content to approximately maxChars characters, cutting at

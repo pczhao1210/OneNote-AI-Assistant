@@ -100,7 +100,20 @@ namespace OneNoteAI.UI
 
             _txtInput.Enter += OnInputEnter;
             _txtInput.Leave += OnInputLeave;
+            _txtInput.KeyDown += OnInputKeyDown;
             Shown += OnDialogShown;
+        }
+
+        private void OnInputKeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Control && e.KeyCode == Keys.Enter)
+            {
+                e.SuppressKeyPress = true;
+                if (!IsPlaceholderActive() && !string.IsNullOrWhiteSpace(_txtInput.Text))
+                {
+                    _btnOk.PerformClick();
+                }
+            }
         }
 
         private void OnDialogShown(object sender, EventArgs e)
