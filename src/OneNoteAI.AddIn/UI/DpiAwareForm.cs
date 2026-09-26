@@ -19,7 +19,7 @@ namespace OneNoteAI.UI
 
         protected bool IsScalingForDpi { get; private set; }
 
-        protected DpiAwareForm()
+        public DpiAwareForm()
         {
             // Own scaling explicitly: Framework 4.8's automatic DPI handling
             // depends on the host EXE's configuration, which an add-in cannot set.
@@ -79,11 +79,16 @@ namespace OneNoteAI.UI
 
             float factor = dpi / (float)_dpi;
             var textViews = new List<RichTextViewState>();
+            var splitViews = new List<SplitViewState>();
             foreach (Control control in _logicalFonts.Keys)
             {
                 if (control is RichTextBox textBox && textBox.IsHandleCreated)
                 {
                     textViews.Add(new RichTextViewState(textBox));
+                }
+                if (control is SplitContainer split)
+                {
+                    splitViews.Add(new SplitViewState(split));
                 }
             }
 
@@ -96,6 +101,10 @@ namespace OneNoteAI.UI
             {
                 MinimumSize = Size.Empty;
                 MaximumSize = Size.Empty;
+                foreach (SplitViewState view in splitViews)
+                {
+                    view.ClearMinimumSizes();
+                }
                 if (factor != 1F)
                 {
                     Scale(new SizeF(factor, factor));
@@ -108,6 +117,10 @@ namespace OneNoteAI.UI
                     entry.Key.Font = font;
                 }
 
+                foreach (SplitViewState view in splitViews)
+                {
+                    view.Restore(factor);
+                }
                 MinimumSize = new Size(ScaleLogical(_logicalMinimumSize.Width), ScaleLogical(_logicalMinimumSize.Height));
                 MaximumSize = new Size(ScaleLogical(_logicalMaximumSize.Width), ScaleLogical(_logicalMaximumSize.Height));
             }
@@ -176,6 +189,39 @@ namespace OneNoteAI.UI
             public int Top;
             public int Right;
             public int Bottom;
+        }
+
+        private sealed class SplitViewState
+        {
+            private readonly SplitContainer _control;
+            private readonly int _distance;
+            private readonly int _width;
+            private readonly int _panel1Minimum;
+            private readonly int _panel2Minimum;
+
+            internal SplitViewState(SplitContainer control)
+            {
+                _control = control;
+                _distance = control.SplitterDistance;
+                _width = control.SplitterWidth;
+                _panel1Minimum = control.Panel1MinSize;
+                _panel2Minimum = control.Panel2MinSize;
+            }
+
+            internal void ClearMinimumSizes()
+            {
+                // Fixed panels and their constraints do not follow Control.Scale.
+                _control.Panel1MinSize = 0;
+                _control.Panel2MinSize = 0;
+            }
+
+            internal void Restore(float factor)
+            {
+                _control.SplitterWidth = Math.Max(1, (int)Math.Round(_width * factor));
+                _control.Panel1MinSize = (int)Math.Round(_panel1Minimum * factor);
+                _control.Panel2MinSize = (int)Math.Round(_panel2Minimum * factor);
+                _control.SplitterDistance = (int)Math.Round(_distance * factor);
+            }
         }
 
         private sealed class RichTextViewState

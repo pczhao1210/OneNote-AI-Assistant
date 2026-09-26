@@ -23,7 +23,7 @@ namespace OneNoteAI.OneNote
                 ?? throw new InvalidOperationException("Failed to cast OneNote Application to IOneNoteApplication.");
         }
 
-        public void AppendOutline(string pageId, string content, string heading = null)
+        public void AppendOutline(string pageId, string content, string heading = null, IEnumerable<(string Label, string Url)> sources = null)
         {
             ValidatePageId(pageId);
 
@@ -39,6 +39,14 @@ namespace OneNoteAI.OneNote
             // Convert Markdown to structured OE elements
             List<string> lines = SplitIntoLines(content);
             XElement outlineElement = CreateMarkdownOutlineElement(nextY, heading, lines);
+            foreach (var source in sources ?? Enumerable.Empty<(string Label, string Url)>())
+            {
+                if (!Uri.TryCreate(source.Url, UriKind.Absolute, out Uri uri) ||
+                    (uri.Scheme != "onenote" && uri.Scheme != "https" && uri.Scheme != "http"))
+                    throw new ArgumentException("Unsupported source link.", nameof(sources));
+                outlineElement.Element(OneNs + "OEChildren").Add(CreateTextOeElement(
+                    "<a href=\"" + WebUtility.HtmlEncode(source.Url) + "\">" + WebUtility.HtmlEncode(source.Label) + "</a>"));
+            }
 
             pageElement.Add(outlineElement);
             UpdatePage(pageDoc);

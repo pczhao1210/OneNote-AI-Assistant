@@ -18,7 +18,7 @@ This plugin connects to DeepSeek, OpenAI, Ollama, or any OpenAI-compatible API, 
 | **Generate** | Create new content from natural language instructions, automatically referencing existing page content |
 | **Template** | Quick structured generation from 6 built-in templates: Meeting Notes, Book Notes, Weekly Report, Study Notes, Project Plan, Brainstorming |
 | **Rewrite** | Rewrite selected text or full page with custom instructions (e.g., "more formal", "more concise") |
-| **Q&A** | Multi-turn Q&A with **cross-page search** across the entire section, **source citations** `[Source: Page Name]`, and automatic token budget management |
+| **Knowledge** | Multi-turn, source-grounded answers and passage search. Independent **semantic + OneNote Search** retrieval, scoped by notebook, section group or section; optional Remote HTTPS MCP |
 | **Translate** | Translate selected text or full page to 8+ target languages (EN/ZH/JA/KO/FR/DE/ES/RU) |
 | **Tag** | AI auto-generates keyword tags (#format), category, and one-line topic summary |
 | **Extract Todos** | Smart two-step extraction: Step 1 reads OneNote native tags (✅/☐), Step 2 uses AI to discover hidden action items. Strictly distinguishes info lists from real todos. Auto-filters sensitive data |
@@ -30,14 +30,32 @@ This plugin connects to DeepSeek, OpenAI, Ollama, or any OpenAI-compatible API, 
 | Provider | Base URL | Default Model | Notes |
 |----------|----------|---------------|-------|
 | **DeepSeek** (default) | `https://api.deepseek.com` | `deepseek-chat` | API key required |
-| **OpenAI** | `https://api.openai.com/v1` | `gpt-4o-mini` | API key required |
-| **Ollama** (local) | `http://localhost:11434/v1` | `qwen2.5:7b` | No API key, fully local |
+| **OpenAI** | `https://api.openai.com/v1` | `gpt-4.1-mini` | API key required |
+| **Qwen** | `https://dashscope.aliyuncs.com/compatible-mode/v1` | `qwen-plus` | API key required |
+| **Zhipu** | `https://open.bigmodel.cn/api/paas/v4` | `glm-4.5-air` | API key required |
+| **Moonshot** | `https://api.moonshot.cn/v1` | `moonshot-v1-8k` | API key required |
+| **MiniMax** | `https://api.minimax.chat/v1` | `MiniMax-Text-01` | API key required |
+| **Gemini** | `https://generativelanguage.googleapis.com/v1beta/openai` | `gemini-2.5-flash` | OpenAI-compatible endpoint |
+| **Claude** | `https://api.anthropic.com` | `claude-sonnet-4-20250514` | Native Messages API |
+| **OpenRouter** | `https://openrouter.ai/api/v1` | `openai/gpt-4.1-mini` | API key required |
+| **Ollama** (local) | `http://localhost:11434/v1` | `qwen2.5:7b` | Chat can stay local; cloud Embeddings/MCP are separate |
 | **Custom** | User-defined | User-defined | Any OpenAI-compatible API |
+
+### New models without code changes
+
+The model field is editable, not limited to its suggestions. Enter the provider's model ID and endpoint; disable automatic model selection when you want to keep a specific DeepSeek model.
+
+Two compatibility controls in **Settings → API / Model** are saved per provider and also apply to connection tests, knowledge answers and other commands:
+
+- **Output limit field**: Auto, `max_tokens`, or `max_completion_tokens`. Auto uses the completion field for OpenAI and recognized OpenAI reasoning model names; other compatible providers keep `max_tokens`. Claude always uses its native `max_tokens`.
+- **Temperature field**: Auto, Send, or Omit. Auto omits it for recognized GPT-5/o-series reasoning names. For a new model or custom deployment alias, select its documented field and choose Omit if temperature is unsupported.
+
+For the error “`max_tokens` is not supported; use `max_completion_tokens`”, select `max_completion_tokens`. If the model rejects temperature, select Omit. No endpoint or model is silently switched, and failed requests are not automatically resubmitted. This configures Chat Completions/Claude Messages; Responses-only APIs are not supported.
 
 ## Requirements
 
 - Windows 10 or later
-- Microsoft OneNote (Microsoft 365 / Office 2019+)
+- Desktop Microsoft OneNote (Microsoft 365 / Office 2019+), x86 or x64; not OneNote for Windows 10/UWP or the web app
 - [.NET Framework 4.8](https://dotnet.microsoft.com/download/dotnet-framework/net48)
 - API key from your chosen provider (not required for Ollama)
 
@@ -51,17 +69,17 @@ and older versions retain the host's DPI mode with a warning in the add-in log.
 This applies only to the add-in's UI thread, without changing OneNote's DPI
 settings or modifying `OneNote.exe.config` / `dllhost.exe.config`.
 Ribbon icons use 128-pixel source artwork instead of enlarged 32-pixel images.
+The same scaling applies to the knowledge assistant, index settings, MCP
+connections, tool catalogs, approval prompts and source viewers.
 After installing an updated build, fully exit and restart OneNote.
 
 ## Installation
 
-1. **Build** (Visual Studio 2019+ or Build Tools):
-   - Open `OneNoteAI.sln`
-   - Build in Release mode
+1. **Build and package** using the developer commands below, or obtain a trusted installer.
 
 2. **Install**:
-   - Run `src/OneNoteAI.Installer/Output/OneNoteAISetup.exe`
-   - Or manually register via `regasm`
+   - Close OneNote and run `src\OneNoteAI.Installer\Output\OneNoteAISetup-2.1.2.exe`
+   - The installer includes managed dependencies and both SQLite native architectures, and registers both COM views on x64 Windows
 
 3. **Restart OneNote** — "AI Assistant" ribbon tab appears (10 buttons)
 
@@ -81,33 +99,70 @@ After installing an updated build, fully exit and restart OneNote.
 | **Generate** | Enter instruction → AI generates content → Insert to page |
 | **Template** | Choose template → Enter key info → AI expands to full document |
 | **Rewrite** | Select text → Enter requirements → Review result |
-| **Q&A** | Select scope → Ask question → AI answers with citations → Follow-up |
+| **Knowledge** | Choose note scope and optional MCP connections → Ask or find passages → Inspect sources → Follow up |
 | **Translate** | Select text → Enter target language → View translation |
 | **Tag** | Click → Auto-analyze → Generate tags/category/topic |
 | **Todos** | Select scope → Shows native tags + AI-discovered action items |
 | **Settings** | Configure API key, model, temperature, custom prompts |
 | **Help** | Open built-in help with detailed documentation |
 
-3. In the result dialog:
+3. Other commands use the result dialog:
    - **Insert** — write result to current OneNote page
    - **Regenerate** — try again with same prompt
-   - **Follow-up** — continue multi-turn conversation (Q&A)
    - **Copy** — copy to clipboard
+
+## Knowledge retrieval
+
+Open **Knowledge** in the ribbon. **Current page** works without an Embedding key or index; **Find passages** does not call the chat model. For cross-page retrieval:
+
+1. Open **Index / MCP settings**. Configure a separate HTTPS Embedding endpoint and API key. Presets are `text-embedding-3-small` (1536 dimensions, default) and `text-embedding-3-large` (3072). Dimensions `0` means the model default; a custom model needs its actual dimensions.
+2. Select the notebooks, section groups or sections you authorize for indexing, then save. Parent consent includes future descendants; identifiers, not display names, define scope. Click **Update index** to upload authorized text for Embeddings.
+3. Choose **Selected note scope** and a query scope within that consent. Ask a question or find passages. Semantic recall and native OneNote Search run independently, then merge; neither is restricted to the other's hits.
+
+No separately deployed vector database is needed. SQLite stores text, provenance, queue state and vectors; section/hash shards use HNSW with a bounded in-memory cache. Updates reuse unchanged vectors and resume persisted batches. Optional automatic refresh runs every five minutes **only while the knowledge window is open**. Changing the Embedding endpoint/model/dimensions requires reindexing and may incur new charges.
+
+OneNote hierarchy timestamps can differ from page-content timestamps. Reads compare each revision source separately and verify content stability. Index refresh checks accessible authorized pages locally, including pages whose hierarchy time did not change; only changed content needs new Embeddings. This local scan can take time for large scopes.
+
+Answers cite `[S1]` note sources separately from `[M1]` MCP results. Double-click a source to navigate to the note or inspect the tool receipt. Each follow-up retrieves fresh evidence; changing scope or service identity resets the conversation. **Save to current page** explicitly writes an answer and provenance to OneNote; changed or inaccessible sources must be refreshed first.
+
+Coverage, failed pages and single-path degradation are reported. Without indexed pages, cross-page search can use OneNote Search alone. A small set of retrieved passages is **not an exhaustive notebook review**, and “no verified passages” does not mean an entire notebook has no answer. Long current pages also use selected passages; use the existing Summary command for page/section summarization.
+
+## Remote HTTPS MCP
+
+In **Index / MCP settings → Remote HTTPS MCP**, add a Streamable HTTP endpoint. JSON and SSE responses are supported through the official MCP C# SDK. Plain HTTP, stdio and legacy standalone HTTP+SSE transports are not supported. Authentication can be none, Bearer, an API-key header, or OAuth.
+
+For **Bearer**, paste the access token issued by that MCP service into **Bearer token**, without the `Bearer ` prefix. The client sends `Authorization: Bearer <token>`. It is not your chat or Embedding key. The API-key-header field is unused in this mode; OAuth obtains tokens through browser login instead.
+
+OAuth uses the system browser, PKCE and a temporary `http://127.0.0.1:<port>/callback/` redirect. The remote service and its authorization endpoints must use HTTPS. Some services require a registered client ID/secret or a real client metadata document URL; otherwise the server must support dynamic registration. Use **Sign out locally** to remove cached authorization, not to revoke permissions at the provider.
+
+The directory exposes tools, resources and prompts. You can inspect schemas, run tools manually, read remote resources and retrieve prompts. Tools default to **Auto approve, including create/update/delete operations**. Set individual tools to **Require approval** or disable them; save settings to apply policy edits to conversations. New tools also default to Auto approve. Only enable trusted servers.
+
+MCP is off by default in each knowledge window. Enable the selected servers explicitly. Automatic calls require native tool calling in the chosen chat model; turn off that capability in settings for unsupported models and use the manual tool interface instead. Tool schemas, history and results share the context budget; set the actual context-window size for custom models.
+
+The activity view distinguishes rejection, tool errors, returned results and **unknown outcome**. Cancellation is not rollback. A response lost after dispatch stops the tool loop and is not automatically replayed: inspect the remote system before retrying. External results remain session-local unless explicitly saved to OneNote. Image/audio/binary content is identified as omitted, not silently treated as text.
+
+## Privacy and local state
+
+- Chat receives the question, selected evidence and any selected tool schemas/results. Embeddings receive authorized note text when indexing and search questions during semantic retrieval. Choosing local Ollama for chat does **not** make cloud Embeddings or MCP local.
+- `%LOCALAPPDATA%\OneNoteAI\Knowledge` contains a **plaintext note/vector cache**, restricted with a current-user directory ACL; this is not database encryption. Keys and OAuth tokens use Windows DPAPI. `%APPDATA%\OneNoteAI\settings.json` stores settings and encrypted credentials.
+- **Clear local index** deletes cached note/vector/index data, not OneNote content or OAuth credentials. Locked/missing notes become ineligible for retrieval; temporary unavailability is not treated as permanent deletion. Use Clear local index to remove all cached content, including unavailable sources. Uninstall preserves user state.
 
 ## Internationalization
 
 The plugin automatically detects your system language:
 - **Chinese system** → Chinese UI and AI prompts
 - **English system** → English UI and AI prompts
-- Manual override available in Settings
+- The persisted `language` setting accepts `auto`, `zh-CN` or `en`; the settings window preserves it
 
 ## Architecture
 
 ```
-OneNote AI Assistant v2.0
+src\OneNoteAI.AddIn
 ├── AddIn/              # COM add-in entry & ribbon callbacks
 ├── AI/                 # AI client (OpenAI-compatible), streaming, token estimation
-│   ├── DeepseekClient     # HTTP + SSE streaming
+│   ├── DeepseekClient     # OpenAI/Claude native streaming and tool calls
+│   ├── EmbeddingClient    # Separate Embedding API, validated normalized vectors
+│   ├── ContextBudget      # Whole-request budget including tool schemas/results
 │   ├── PromptTemplates    # Bilingual structured output templates
 │   ├── ContentChunker     # Long text segmentation
 │   └── TokenEstimator     # Token counting
@@ -116,10 +171,13 @@ OneNote AI Assistant v2.0
 │   ├── GenerateCommand    # Content generation
 │   ├── TemplateCommand    # Template generation (6 presets)
 │   ├── RewriteCommand     # Rewrite
-│   ├── QACommand          # Q&A (cross-page + citations + multi-turn)
+│   ├── QACommand          # Knowledge-window entry point
 │   ├── TranslateCommand   # Translation
 │   ├── TagCommand         # Auto-tag/classify
 │   └── ExtractTodosCommand # Todo extraction (native tags + AI)
+├── Knowledge/          # Consent, chunking, SQLite, incremental indexing, HNSW, hybrid recall
+├── Mcp/                # HTTPS transport, OAuth, discovery, schema/approval/dispatch
+├── Conversation/       # Evidence registry, fresh retrieval, native model/tool loop
 ├── OneNote/            # OneNote COM interop
 │   ├── OneNoteProvider    # Page/section reading
 │   ├── PageParser         # XML parsing (incl. Tag recognition)
@@ -137,16 +195,54 @@ OneNote AI Assistant v2.0
 
 ## Tech Stack
 
-- **Language**: C# 9.0
+- **Language**: C# 12 (pinned compiler)
 - **Framework**: .NET Framework 4.8
 - **Runtime**: COM Add-in (IDTExtensibility2 + IRibbonExtensibility)
 - **OneNote**: Microsoft.Office.Interop.OneNote (v15.0)
-- **AI**: OpenAI-compatible Chat Completions API
+- **AI**: OpenAI-compatible Chat Completions, Claude Messages, OpenAI-compatible Embeddings
 - **HTTP**: System.Net.Http (SSE streaming)
 - **JSON**: Newtonsoft.Json 13.0.3
-- **Security**: DPAPI encryption (local API key storage)
-- **Installer**: Inno Setup 6
-- **Build**: Visual Studio 2019+ / MSBuild 16.11
+- **Index**: System.Data.SQLite.Core 1.0.119, HNSW 25.3.56901
+- **MCP**: ModelContextProtocol.Core 2.2.0, JsonSchema.Net 7.3.4
+- **Credentials**: DPAPI encryption; the note cache is not encrypted
+- **Installer**: Inno Setup 6.5+
+- **Build**: Visual Studio 2022 / current MSBuild 17 (17.14 recommended), NuGet PackageReference with lock files
+
+## Build and test
+
+On Windows, install Visual Studio/Build Tools with .NET desktop development, desktop OneNote and the Office/OneNote interop assemblies. Reference assemblies and the C# compiler are restored through NuGet. From a Developer PowerShell at the repository root:
+
+```powershell
+msbuild .\OneNoteAI.sln -restore -p:RestoreLockedMode=true -p:Configuration=Release
+.\tests\OneNoteAI.Tests\bin\Release\OneNoteAI.Tests.exe
+```
+
+To run only the DPI and UI regression scenarios (Windows 10 1703+):
+
+```powershell
+.\tests\OneNoteAI.Tests\bin\Release\OneNoteAI.Tests.exe High-DPI WinForms
+```
+
+The DPI scenario covers English and Chinese dialogs at 100%-300% scaling,
+native font sizes, grid headers and user-resized splitters. It also moves a
+hidden test window between available monitors to check native DPI notifications.
+
+The executable suite uses synthetic notes, HTTP responses and isolated settings/cache directories, without real notes, paid API calls or remote writes. It covers provider drafts, parsing, streaming, scopes, resumable indexing, native tool loops, MCP policies/OAuth and WinForms. ANN cases include 5,000 vectors each at 1536 and 3072 dimensions. Arguments select scenario names, for example `OneNoteAI.Tests.exe MCP OAuth`.
+
+For an isolated x86 run:
+
+```powershell
+msbuild .\OneNoteAI.sln -p:Configuration=Release -p:PlatformTarget=x86 -p:OutputPath=bin\Release-x86\
+.\tests\OneNoteAI.Tests\bin\Release-x86\OneNoteAI.Tests.exe
+```
+
+Keep the AnyCPU Release output for packaging. Install Inno Setup and ensure `Languages\ChineseSimplified.isl` is present ([official translations](https://jrsoftware.org/files/istrans/)), then compile:
+
+```powershell
+& 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe' .\src\OneNoteAI.Installer\setup.iss
+```
+
+Real OneNote COM hosting, browser OAuth with individual providers and real remote MCP services still need installation-level testing. Synthetic ANN checks do not establish large-library latency, total-process memory limits or retrieval quality on a labeled corpus.
 
 ## Developer
 
@@ -156,3 +252,5 @@ OneNote AI Assistant v2.0
 ## License
 
 Private — All rights reserved.
+
+Bundled dependency licenses and notices are in [THIRD-PARTY-NOTICES.txt](THIRD-PARTY-NOTICES.txt) and included in the installer.

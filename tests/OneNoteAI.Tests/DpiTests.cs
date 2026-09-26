@@ -1,30 +1,32 @@
-// Build the add-in first, then compile this standalone .NET Framework test runner:
-// csc /r:System.Drawing.dll /r:System.Windows.Forms.dll /r:src\OneNoteAI.AddIn\bin\Release\OneNoteAI.AddIn.dll /out:src\OneNoteAI.AddIn\bin\Release\DpiSmokeTests.exe tools\DpiSmokeTests.cs
-// Run DpiSmokeTests.exe on Windows 10 1703+. No OneNote instance or API key is required.
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.IO;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
+using OneNoteAI.Knowledge;
 using OneNoteAI.Settings;
 using OneNoteAI.UI;
 
-internal static class DpiSmokeTests
+namespace OneNoteAI.Tests;
+
+internal static class DpiTests
 {
     private static int _assertions;
 
-    [STAThread]
-    private static int Main()
+    internal static void Run(string root)
     {
+        IntPtr originalContext = GetThreadDpiAwarenessContext();
+        var currentSettings = typeof(SettingsManager).GetField("_current", BindingFlags.Static | BindingFlags.NonPublic);
+        object originalSettings = currentSettings.GetValue(null);
         try
         {
+            _assertions = 0;
             // Model an unaware COM host even if the launching shell is DPI-aware.
             SetThreadDpiAwarenessContext(new IntPtr(-1));
             IntPtr hostContext = GetThreadDpiAwarenessContext();
-            Strings.SetLanguage("en");
-            typeof(SettingsManager).GetField("_current", BindingFlags.Static | BindingFlags.NonPublic)
-                .SetValue(null, new AppSettings());
+            currentSettings.SetValue(null, new AppSettings());
 
             UiThread.EnsureStarted();
             Assert(AreDpiAwarenessContextsEqual(hostContext, GetThreadDpiAwarenessContext()),
@@ -37,26 +39,38 @@ internal static class DpiSmokeTests
                     "UI thread must be PerMonitorV2 on Windows 10 1703+.");
                 Assert(AreDpiAwarenessContextsEqual(GetWindowDpiAwarenessContext(UiThread.Anchor.Handle), new IntPtr(-4)),
                     "Message-loop anchor must be created after DPI initialization.");
+                CheckNativeMonitorMoves();
 
-                CheckDialog(new PromptDialog("DPI prompt", "Instruction", "Placeholder"));
-                CheckDialog(new ScopeDialog("DPI scope", "Section", 3));
-                CheckDialog(new SettingsDialog());
-                CheckDialog(new ProgressOverlay());
-                CheckDialog(new HelpDialog());
-                var result = new ResultDialog("DPI result");
-                result.OnRegenerate = delegate { };
-                result.OnFollowUp = delegate { };
-                result.SetResult("# Heading\nNormal **bold** and *italic*\n- Bullet");
-                CheckDialog(result);
+                foreach (string language in new[] { "en", "zh" })
+                {
+                    Strings.SetLanguage(language);
+                    CheckDialog(new PromptDialog("DPI prompt", "Instruction", "Placeholder"));
+                    CheckDialog(new ScopeDialog("DPI scope", "Section", 3));
+                    CheckDialog(new SettingsDialog());
+                    CheckDialog(new ProgressOverlay());
+                    CheckDialog(new HelpDialog());
+                    var result = new ResultDialog("DPI result");
+                    result.OnRegenerate = delegate { };
+                    result.OnFollowUp = delegate { };
+                    result.SetResult("# Heading\nNormal **bold** and *italic*\n- Bullet");
+                    CheckDialog(result);
+
+                    CheckDialog(new KnowledgeSettingsDialog(new FakeNotes().Hierarchy()));
+                    var server = new McpServerOptions { Name = "Synthetic", Endpoint = "https://example.invalid/mcp" };
+                    CheckDialog(new McpServerDialog(server));
+                    CheckDialog(new McpToolsDialog(server));
+                    using (var store = new IndexStore(Path.Combine(root, "dpi-" + language)))
+                        CheckDialog(new KnowledgeDialog(new FakeNotes(), store, () => "p1"));
+                }
             });
 
-            Console.WriteLine("PASS: " + _assertions + " DPI assertions across all six dialogs.");
-            return 0;
+            Console.WriteLine(_assertions + " DPI assertions across original, knowledge and MCP dialogs.");
         }
-        catch (Exception error)
+        finally
         {
-            Console.Error.WriteLine(error);
-            return 1;
+            currentSettings.SetValue(null, originalSettings);
+            Strings.SetLanguage(null);
+            SetThreadDpiAwarenessContext(originalContext);
         }
     }
 
@@ -77,14 +91,48 @@ internal static class DpiSmokeTests
         Assert(count == 10, "All ten high-resolution ribbon images are embedded.");
     }
 
+    private static void CheckNativeMonitorMoves()
+    {
+        using (var form = new PromptDialog("Native DPI", "Monitor transitions"))
+        {
+            var fonts = new Dictionary<Control, float>();
+            CaptureFonts(form, fonts);
+            IntPtr handle = form.Handle;
+            typeof(DpiAwareForm).GetMethod("OnLoad", BindingFlags.Instance | BindingFlags.NonPublic)
+                .Invoke(form, new object[] { EventArgs.Empty });
+            CheckNativeFonts(form, fonts);
+            foreach (Screen screen in Screen.AllScreens)
+            {
+                form.Location = screen.WorkingArea.Location + new Size(100, 100);
+                CheckNativeFonts(form, fonts);
+            }
+        }
+    }
+
+    private static void CheckNativeFonts(Form form, Dictionary<Control, float> fonts)
+    {
+        int dpi = (int)GetDpiForWindow(form.Handle);
+        foreach (var entry in fonts) CheckFont(form, entry.Key, entry.Value, dpi);
+        Console.WriteLine("Native monitor/centering DPI " + dpi + ": fonts matched the window.");
+    }
+
     private static void CheckDialog(DpiAwareForm form)
     {
         using (form)
         {
+            // Keep synthetic transitions on one monitor, without native centering moves.
+            form.StartPosition = FormStartPosition.Manual;
+            form.Location = Screen.PrimaryScreen.WorkingArea.Location + new Size(100, 100);
+            DataGridView grid = Find<DataGridView>(form);
+            if (grid != null) grid.Rows.Add(true, "Auto approve", "synthetic.tool", "Tool description");
             Size logicalClient = form.ClientSize;
             Size logicalMinimum = form.MinimumSize;
             var logicalFonts = new Dictionary<Control, float>();
             CaptureFonts(form, logicalFonts);
+            SplitContainer split = Find<SplitContainer>(form);
+            int splitterDistance = split?.SplitterDistance ?? 0;
+            int splitterWidth = split?.SplitterWidth ?? 0;
+            int panelMinimum = split?.Panel1MinSize ?? 0;
 
             IntPtr handle = form.Handle;
             Assert(AreDpiAwarenessContextsEqual(GetWindowDpiAwarenessContext(handle), new IntPtr(-4)),
@@ -105,6 +153,23 @@ internal static class DpiSmokeTests
                     Assert(content.SelectionStart == 3 && content.SelectionLength == 5,
                         form.GetType().Name + " text selection survived DPI change.");
                 }
+                if (split != null)
+                {
+                    Assert(Math.Abs(split.SplitterDistance - splitterDistance * dpi / 96F) <= 2,
+                        "Knowledge scope splitter distance at " + dpi + ": " + split.SplitterDistance);
+                    Assert(Math.Abs(split.Panel1MinSize - panelMinimum * dpi / 96F) <= 1,
+                        "Knowledge scope minimum width at " + dpi + ": " + split.Panel1MinSize);
+                    Assert(Math.Abs(split.SplitterWidth - splitterWidth * dpi / 96F) <= 1,
+                        "Knowledge splitter grip width at " + dpi + ": " + split.SplitterWidth);
+                }
+            }
+            if (split != null)
+            {
+                split.SplitterDistance = 350;
+                ChangeDpi(form, 192, logicalClient);
+                Assert(split.SplitterDistance == 700, "User-resized scope width scales proportionally.");
+                ChangeDpi(form, 96, logicalClient);
+                Assert(split.SplitterDistance == 350, "User-resized scope width survives a round trip.");
             }
 
             // Keep user state and rich-text styles while moving between monitors.
@@ -139,23 +204,19 @@ internal static class DpiSmokeTests
     {
         RealizeTabs(form);
         float scale = dpi / 96F;
-        Assert(Math.Abs(form.ClientSize.Width - client.Width * scale) <= 1 &&
-            Math.Abs(form.ClientSize.Height - client.Height * scale) <= 1,
-            form.GetType().Name + " client size at " + dpi + ": " + form.ClientSize);
+        // Windows caps top-level window bounds at the monitor's maximum tracking size.
+        Size maximum = SystemInformation.MaxWindowTrackSize - (form.Size - form.ClientSize);
+        float expectedWidth = Math.Min(client.Width * scale, maximum.Width);
+        float expectedHeight = Math.Min(client.Height * scale, maximum.Height);
+        Assert(Math.Abs(form.ClientSize.Width - expectedWidth) <= 1 &&
+            Math.Abs(form.ClientSize.Height - expectedHeight) <= 1,
+            form.GetType().Name + " client size at " + dpi + ": " + form.ClientSize +
+            ", logical " + client + ", maximum " + maximum);
         Assert(form.MinimumSize == new Size((int)Math.Round(minimum.Width * scale), (int)Math.Round(minimum.Height * scale)),
             form.GetType().Name + " minimum size at " + dpi);
         foreach (var entry in fonts)
         {
-            float pixels;
-            using (Graphics graphics = entry.Key.CreateGraphics())
-            {
-                // RichEdit exposes its native font in points, rounded to twips.
-                pixels = entry.Key.Font.Unit == GraphicsUnit.Pixel ? entry.Key.Font.Size :
-                    entry.Key.Font.SizeInPoints * graphics.DpiY / 72F;
-            }
-            Assert(Math.Abs(pixels - entry.Value * dpi / 72F) < 0.15F,
-                form.GetType().Name + " " + entry.Key.GetType().Name + " font at " + dpi +
-                ": actual " + entry.Key.Font.Size + " " + entry.Key.Font.Unit + ", logical points " + entry.Value);
+            CheckFont(form, entry.Key, entry.Value, dpi);
             if (entry.Key is Button)
             {
                 var button = (Button)entry.Key;
@@ -168,7 +229,7 @@ internal static class DpiSmokeTests
         }
 
         TreeView tree = Find<TreeView>(form);
-        if (tree != null) Assert(tree.ItemHeight == (int)Math.Round(26 * scale), "Help tree row height.");
+        if (form is HelpDialog) Assert(tree.ItemHeight == (int)Math.Round(26 * scale), "Help tree row height.");
         if (form is ResultDialog)
         {
             var close = (Button)form.CancelButton;
@@ -176,6 +237,31 @@ internal static class DpiSmokeTests
             Assert(close.Parent.ClientSize.Width - close.Right == (int)Math.Round(20 * scale),
                 "Result action right spacing.");
         }
+        DataGridView grid = Find<DataGridView>(form);
+        if (grid != null)
+        {
+            using (Graphics graphics = grid.CreateGraphics())
+            {
+                Assert(grid.Rows[0].Height >= Math.Ceiling(grid.Font.GetHeight(graphics)) + 4,
+                    "MCP tool row is clipped at " + dpi + ": " + grid.Rows[0].Height);
+                Assert(grid.ColumnHeadersHeight >= Math.Ceiling(grid.Font.GetHeight(graphics)) + 4,
+                    "MCP tool header is clipped at " + dpi + ": " + grid.ColumnHeadersHeight);
+            }
+        }
+    }
+
+    private static void CheckFont(Form form, Control control, float logicalPoints, int dpi)
+    {
+        float pixels;
+        using (Graphics graphics = control.CreateGraphics())
+        {
+            // RichEdit exposes its native font in points, rounded to twips.
+            pixels = control.Font.Unit == GraphicsUnit.Pixel ? control.Font.Size :
+                control.Font.SizeInPoints * graphics.DpiY / 72F;
+        }
+        Assert(Math.Abs(pixels - logicalPoints * dpi / 72F) < 0.15F,
+            form.GetType().Name + " " + control.GetType().Name + " font at " + dpi +
+            ": actual " + control.Font.Size + " " + control.Font.Unit + ", logical points " + logicalPoints);
     }
 
     private static void RealizeTabs(Control parent)
@@ -217,10 +303,11 @@ internal static class DpiSmokeTests
         int extendedStyle = GetWindowLong(form.Handle, -20);
         Assert(AdjustWindowRectExForDpi(ref bounds, style, false, extendedStyle, (uint)GetDpiForWindow(form.Handle)),
             "Calculate native frame.");
-        bounds.Right -= bounds.Left;
-        bounds.Bottom -= bounds.Top;
-        bounds.Left = 0;
-        bounds.Top = 0;
+        Point origin = Screen.PrimaryScreen.WorkingArea.Location;
+        bounds.Right = origin.X + bounds.Right - bounds.Left;
+        bounds.Bottom = origin.Y + bounds.Bottom - bounds.Top;
+        bounds.Left = origin.X;
+        bounds.Top = origin.Y;
         IntPtr memory = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(NativeRectangle)));
         try
         {

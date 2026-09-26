@@ -1,64 +1,62 @@
 using System;
-using System.Diagnostics;
 using System.IO;
-using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using Newtonsoft.Json;
-using OneNoteAI.AI.Models;
+using Newtonsoft.Json.Linq;
 
 namespace OneNoteAI.AI
 {
-    public class DeepseekStreamReader
+    public static class DeepseekStreamReader
     {
-        public static async Task ReadStreamAsync(Stream stream, Action<string> onToken, CancellationToken cancellationToken)
+        public static Task ReadStreamAsync(Stream stream, Action<string> onToken, CancellationToken cancellationToken)
         {
-            if (stream == null)
+            return ReadEventsAsync(stream, data =>
             {
-                throw new ArgumentNullException(nameof(stream));
-            }
+                string text = (string)data["choices"]?[0]?["delta"]?["content"];
+                if (!string.IsNullOrEmpty(text)) onToken(text);
+            }, cancellationToken);
+        }
 
-            if (onToken == null)
+        internal static async Task ReadEventsAsync(Stream stream, Action<JObject> onEvent, CancellationToken token)
+        {
+            if (stream == null) throw new ArgumentNullException(nameof(stream));
+            var cancelled = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            using (token.Register(() => cancelled.TrySetCanceled()))
+            using (var reader = new StreamReader(stream, Encoding.UTF8))
             {
-                throw new ArgumentNullException(nameof(onToken));
-            }
-
-            using (StreamReader reader = new StreamReader(stream, Encoding.UTF8))
-            {
-                string line;
-                while ((line = await reader.ReadLineAsync().ConfigureAwait(false)) != null)
+                var data = new StringBuilder();
+                while (true)
                 {
-                    cancellationToken.ThrowIfCancellationRequested();
-
-                    if (string.IsNullOrWhiteSpace(line))
+                    token.ThrowIfCancellationRequested();
+                    Task<string> read = reader.ReadLineAsync();
+                    if (await Task.WhenAny(read, cancelled.Task).ConfigureAwait(false) != read)
                     {
-                        continue;
+                        // Observe a read that faults after disposal without delaying cancellation.
+                        _ = read.ContinueWith(t => { var error = t.Exception; }, TaskContinuationOptions.OnlyOnFaulted);
+                        token.ThrowIfCancellationRequested();
                     }
-
-                    if (!line.StartsWith("data: ", StringComparison.Ordinal))
+                    string line = await read.ConfigureAwait(false);
+                    token.ThrowIfCancellationRequested();
+                    if (line == null || line.Length == 0)
                     {
-                        continue;
-                    }
-
-                    string data = line.Substring(6);
-                    if (string.Equals(data, "[DONE]", StringComparison.Ordinal))
-                    {
-                        break;
-                    }
-
-                    try
-                    {
-                        StreamChunk chunk = JsonConvert.DeserializeObject<StreamChunk>(data);
-                        string content = chunk?.Choices?.FirstOrDefault()?.Delta?.Content;
-                        if (!string.IsNullOrEmpty(content))
+                        if (data.Length > 0)
                         {
-                            onToken(content);
+                            string payload = data.ToString().TrimEnd('\n');
+                            data.Clear();
+                            if (payload == "[DONE]") return;
+                            JObject parsed = JObject.Parse(payload);
+                            if (parsed["error"] != null)
+                                throw new InvalidOperationException("AI stream error: " + (string)parsed["error"]?["message"]);
+                            onEvent(parsed);
                         }
+                        if (line == null) return;
                     }
-                    catch (JsonException)
+                    else if (line.StartsWith("data:", StringComparison.Ordinal))
                     {
-                        Debug.WriteLine(string.Format("DeepseekStreamReader: Failed to parse chunk: {0}", data));
+                        data.Append(line.Substring(5).TrimStart(' ')).Append('\n');
+                        if (data.Length > 2 * 1024 * 1024)
+                            throw new InvalidDataException("AI stream event exceeds the 2 MiB limit.");
                     }
                 }
             }

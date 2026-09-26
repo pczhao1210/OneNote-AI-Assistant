@@ -535,6 +535,10 @@ namespace OneNoteAI.UI
                 _btnRegenerate.Enabled = _streamComplete;
                 _btnFollowUp.Enabled = _streamComplete && OnFollowUp != null;
             }
+            finally
+            {
+                if (!IsDisposed) UpdateRegenerateButton();
+            }
         }
 
         private void OnFollowUpClick(object sender, EventArgs e)
@@ -553,6 +557,10 @@ namespace OneNoteAI.UI
                 Msg.Show("追问失败：" + ex.Message, "OneNote AI Assistant", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 _btnRegenerate.Enabled = _streamComplete && OnRegenerate != null;
                 _btnFollowUp.Enabled = _streamComplete;
+            }
+            finally
+            {
+                if (!IsDisposed) UpdateRegenerateButton();
             }
         }
 

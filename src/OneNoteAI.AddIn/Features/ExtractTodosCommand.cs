@@ -119,7 +119,7 @@ namespace OneNoteAI.Features
                 ProgressOverlay localProgress = ProgressOverlay.Show(null);
                 try
                 {
-                    using (DeepseekClient client = new DeepseekClient(apiKey, settings.ApiBaseUrl))
+                    using (DeepseekClient client = new DeepseekClient(settings))
                     {
                         // First show native tags section (if any)
                         if (!string.IsNullOrWhiteSpace(nativeSection))
@@ -216,7 +216,7 @@ namespace OneNoteAI.Features
                 resultDialog.Show(UiThread.Anchor);
 
                 string apiKey = SettingsManager.GetApiKey();
-                using (DeepseekClient client = new DeepseekClient(apiKey, settings.ApiBaseUrl))
+                using (DeepseekClient client = new DeepseekClient(settings))
                 {
                     bool anyEmitted = false;
                     for (int i = 0; i < sectionPages.Count; i++)

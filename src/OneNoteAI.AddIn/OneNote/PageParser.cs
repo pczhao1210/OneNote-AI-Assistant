@@ -136,16 +136,30 @@ namespace OneNoteAI.OneNote
                 }
             }
 
+            XElement table = oeElement.Element(OneNs + "Table");
+            if (table != null)
+            {
+                foreach (XElement row in table.Elements(OneNs + "Row"))
+                {
+                    int column = 0;
+                    foreach (XElement cell in row.Elements(OneNs + "Cell"))
+                    {
+                        column++;
+                        var cells = cell.Element(OneNs + "OEChildren");
+                        if (cells == null) continue;
+                        int start = outline.TextBlocks.Count;
+                        foreach (XElement child in cells.Elements(OneNs + "OE"))
+                            ParseOeElement(child, outline, indentLevel + 1, tagDefs);
+                        foreach (TextBlock block in outline.TextBlocks.Skip(start))
+                            block.TableColumn = column;
+                    }
+                    if (outline.TextBlocks.Count > 0) outline.TextBlocks.Last().EndsTableRow = true;
+                }
+            }
             XElement childrenElement = oeElement.Element(OneNs + "OEChildren");
-            if (childrenElement == null)
-            {
-                return;
-            }
-
-            foreach (XElement childOe in childrenElement.Elements(OneNs + "OE"))
-            {
-                ParseOeElement(childOe, outline, indentLevel + 1, tagDefs);
-            }
+            if (childrenElement != null)
+                foreach (XElement childOe in childrenElement.Elements(OneNs + "OE"))
+                    ParseOeElement(childOe, outline, indentLevel + 1, tagDefs);
         }
 
         private static string GetPageTitle(XElement pageElement)
@@ -189,7 +203,8 @@ namespace OneNoteAI.OneNote
                 return string.Empty;
             }
 
-            string withoutTags = Regex.Replace(html, "<[^>]+>", string.Empty);
+            string separated = Regex.Replace(html, @"<br\s*/?>|</(?:p|div|li|tr)>", "\n", RegexOptions.IgnoreCase);
+            string withoutTags = Regex.Replace(separated, "<[^>]+>", string.Empty);
             return WebUtility.HtmlDecode(withoutTags).Trim();
         }
     }
