@@ -3,11 +3,11 @@
 [Setup]
 AppId={{67A7A8F4-62B1-449C-91E2-58257C4BFDAA}
 AppName=OneNote AI Assistant
-AppVersion=2.1.2
+AppVersion=2.1.8
 AppPublisher=OneNote AI Assistant
 DefaultDirName={autopf}\OneNoteAI
 DefaultGroupName=OneNote AI Assistant
-OutputBaseFilename=OneNoteAISetup-2.1.2
+OutputBaseFilename=OneNoteAISetup-2.1.8
 ArchitecturesAllowed=x86 x64os
 ArchitecturesInstallIn64BitMode=x64os
 PrivilegesRequired=admin

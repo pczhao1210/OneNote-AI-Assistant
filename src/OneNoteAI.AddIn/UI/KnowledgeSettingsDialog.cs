@@ -21,13 +21,15 @@ namespace OneNoteAI.UI
         private readonly ComboBox _model = new ComboBox { DropDownStyle = ComboBoxStyle.DropDown };
         private readonly NumericUpDown _dimensions = new NumericUpDown { Minimum = 0, Maximum = 16384 };
         private readonly NumericUpDown _context = new NumericUpDown { Minimum = 0, Maximum = 4000000, Increment = 1024 };
+        private readonly NumericUpDown _retrievedChunks = new NumericUpDown { Minimum = 1, Maximum = KnowledgeOptions.MaxRetrievedChunksLimit };
         private readonly CheckBox _tools = new CheckBox { AutoSize = true };
         private readonly CheckBox _automatic = new CheckBox { AutoSize = true };
+        private readonly CheckBox _diagrams = new CheckBox { AutoSize = true };
         private readonly KnowledgeScopeTree _scope = new KnowledgeScopeTree();
         private readonly ListBox _servers = new ListBox { Dock = DockStyle.Fill };
         private CancellationTokenSource _test;
 
-        public KnowledgeSettingsDialog(NoteNode hierarchy)
+        public KnowledgeSettingsDialog(NoteNode hierarchy, Func<string> runtimeVersion = null)
         {
             _draft = (SettingsManager.Current.Knowledge ?? new KnowledgeOptions()).Clone();
             Text = L("知识索引与 MCP 设置", "Knowledge index and MCP settings");
@@ -44,13 +46,14 @@ namespace OneNoteAI.UI
             Field(fields, L("Embedding 模型", "Embedding model"), _model);
             Field(fields, L("维度（0 = 模型默认）", "Dimensions (0 = model default)"), _dimensions);
             Field(fields, L("聊天上下文窗口（0 = 预设）", "Chat context window (0 = preset)"), _context);
-            _tools.Text = L("当前聊天模型支持原生工具调用", "Chat model supports native tool calling");
-            Field(fields, L("自动 MCP", "Automatic MCP"), _tools);
+            Field(fields, L("检索片段上限（1-100）", "Retrieved passage limit (1-100)"), _retrievedChunks);
+            _tools.Text = L("模型支持工具调用，文档不足或必要时使用", "Model supports tool calling; use only when needed");
+            Field(fields, L("按需 MCP", "On-demand MCP"), _tools);
             _automatic.Text = L("窗口打开时，每 5 分钟增量更新", "Incremental refresh every 5 minutes while the window is open");
             Field(fields, L("自动索引", "Automatic indexing"), _automatic);
             var notice = new Label { Dock = DockStyle.Top, AutoSize = true, Padding = new Padding(12), MaximumSize = new Size(760, 0),
-                Text = L("勾选范围即授权：构建索引时，其正文会发送至以上 Embedding 服务。本地保存笔记与向量副本，无需额外数据库服务。父级授权包含以后新增的子级；更换模型、地址或维度需重建。自定义聊天模型请填写实际上下文窗口。",
-                    "Selected notes will be sent to this Embedding service when indexing. Notes and vectors are cached locally; no database server is needed. Parent consent includes future descendants. Changing endpoint/model/dimensions requires reindexing. Set the actual context window for custom chat models.") };
+                Text = L("勾选范围即授权：构建索引时，其正文会发送至以上 Embedding 服务。本地保存笔记与向量副本，无需额外数据库服务。父级授权包含以后新增的子级；更换模型、地址或维度需重建。自定义聊天模型请填写实际上下文窗口。检索默认最多 16 个片段；调大可能增加耗时，实际送入模型的数量仍受上下文预算限制。",
+                    "Selected notes are sent to the Embedding service when indexing and cached locally. Parent consent includes future descendants. Changing endpoint/model/dimensions requires reindexing. Set the actual context window for custom models. Retrieval defaults to 16 passages; higher limits may be slower, and the model context budget can reduce the final count.") };
             var test = Theme.CreateSecondaryButton(L("测试 Embedding", "Test Embedding"));
             test.Dock = DockStyle.Bottom;
             test.Height = 36;
@@ -98,6 +101,29 @@ namespace OneNoteAI.UI
             mcp.Controls.Add(mcpNotice);
             tabs.TabPages.Add(embedding);
             tabs.TabPages.Add(mcp);
+            var display = new TabPage(L("回答显示", "Answer display"));
+            var displayFields = Fields();
+            _diagrams.Text = L("启用 Mermaid 流程图预览（需要 WebView2）", "Enable Mermaid diagram previews (requires WebView2)");
+            Field(displayFields, L("流程图", "Diagrams"), _diagrams);
+            var runtime = new Label { AutoSize = true, MaximumSize = new Size(480, 0) };
+            Field(displayFields, "WebView2 Runtime", runtime);
+            var download = new LinkLabel { AutoSize = true, Text = L("Microsoft WebView2 下载页面", "Microsoft WebView2 download page") };
+            download.LinkClicked += (s, e) => System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(
+                "https://developer.microsoft.com/microsoft-edge/webview2/") { UseShellExecute = true });
+            Field(displayFields, "", download);
+            bool CheckRuntime()
+            {
+                try { runtime.Text = runtimeVersion == null ? DiagramPreviewDialog.RuntimeVersion() : runtimeVersion(); runtime.ForeColor = Theme.TextSecondary; return true; }
+                catch (InvalidOperationException ex) { runtime.Text = ex.Message; runtime.ForeColor = Theme.AccentRed; return false; }
+            }
+            _diagrams.CheckedChanged += (s, e) => { if (_diagrams.Checked && !CheckRuntime()) _diagrams.Checked = false; };
+            _diagrams.Checked = _draft.EnableDiagramPreview;
+            if (!_diagrams.Checked && string.IsNullOrEmpty(runtime.Text)) runtime.Text = L("启用时检测；默认关闭", "Checked when enabled; off by default");
+            display.Controls.Add(new Label { Dock = DockStyle.Fill, Padding = new Padding(16),
+                Text = L("正文使用原生富文本显示表格、标题、列表和代码块，无需浏览器。\n\n开启后，完整的 Mermaid 代码块下会显示“查看流程图”，点击在独立窗口中本地渲染。资源随安装包提供，不向外部渲染服务发送内容。语法错误时保留源码并提示；不会自动下载或安装 WebView2。",
+                    "Tables, headings, lists and code use native rich text, with no browser required.\n\nWhen enabled, complete Mermaid blocks offer View diagram in a separate local preview. Assets ship with the add-in; content is not sent to an external renderer. Invalid syntax keeps the source and shows an error. WebView2 is never downloaded or installed automatically.") });
+            display.Controls.Add(displayFields);
+            tabs.TabPages.Add(display);
             var footer = new FlowLayoutPanel { Dock = DockStyle.Bottom, Height = 56, FlowDirection = FlowDirection.RightToLeft, Padding = new Padding(8) };
             Button save = Theme.CreatePrimaryButton(L("保存设置", "Save settings"));
             Button cancel = Theme.CreateSecondaryButton(L("取消", "Cancel"));
@@ -110,8 +136,11 @@ namespace OneNoteAI.UI
                     _draft.Embedding = EmbeddingDraft();
                     _draft.AllowedRootIds = _scope.CheckedRoots;
                     _draft.ContextWindow = (int)_context.Value;
+                    _draft.MaxRetrievedChunks = (int)_retrievedChunks.Value;
                     _draft.ModelSupportsTools = _tools.Checked;
                     _draft.AutomaticIndexing = _automatic.Checked;
+                    if (_diagrams.Checked && !CheckRuntime()) return;
+                    _draft.EnableDiagramPreview = _diagrams.Checked;
                     _draft.Validate();
                     AppSettings latest = SettingsManager.Snapshot();
                     latest.Knowledge = _draft;
@@ -129,6 +158,7 @@ namespace OneNoteAI.UI
             _model.Text = _draft.Embedding.Model;
             _dimensions.Value = _draft.Embedding.Dimensions ?? 0;
             _context.Value = _draft.ContextWindow;
+            _retrievedChunks.Value = _draft.MaxRetrievedChunks;
             _tools.Checked = _draft.ModelSupportsTools;
             _automatic.Checked = _draft.AutomaticIndexing;
             _scope.Populate(hierarchy, _draft.AllowedRootIds);

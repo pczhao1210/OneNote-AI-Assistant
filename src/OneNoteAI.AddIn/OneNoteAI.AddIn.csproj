@@ -34,6 +34,8 @@
     <PackageReference Include="MessagePack" Version="2.5.305" />
     <PackageReference Include="ModelContextProtocol.Core" Version="2.2.0" />
     <PackageReference Include="JsonSchema.Net" Version="7.3.4" />
+    <PackageReference Include="Markdig" Version="1.4.0" />
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4191.47" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="Microsoft.CSharp" />
@@ -69,6 +71,10 @@
     <None Include="App.config" />
     <EmbeddedResource Include="Ribbon\CustomUI.xml" />
     <EmbeddedResource Include="Ribbon\Icons\*.png" />
+    <EmbeddedResource Include="Ribbon\Icons\QA.ico" />
+    <EmbeddedResource Include="UI\Assets\mermaid.min.js" />
+    <EmbeddedResource Include="UI\Assets\diagram.html" />
+    <EmbeddedResource Include="UI\Assets\diagram.js" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

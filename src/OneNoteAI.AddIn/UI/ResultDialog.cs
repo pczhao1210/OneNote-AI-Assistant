@@ -1,7 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Runtime.InteropServices;
-using System.Text.RegularExpressions;
 using System.Windows.Forms;
 
 namespace OneNoteAI.UI
@@ -21,6 +21,7 @@ namespace OneNoteAI.UI
         private static extern IntPtr SendMessage(IntPtr hWnd, int msg, IntPtr wParam, IntPtr lParam);
 
         private readonly RichTextBox _rtbResult;
+        private readonly List<string> _diagrams = new List<string>();
         private readonly Panel _buttonPanel;
         private readonly Button _btnInsert;
         private readonly Button _btnCopy;
@@ -138,7 +139,7 @@ namespace OneNoteAI.UI
                 BackColor = Color.FromArgb(224, 224, 230) // subtle border color
             };
 
-            _rtbResult = new RichTextBox
+            _rtbResult = new MarkdownBox
             {
                 Dock = DockStyle.Fill,
                 ReadOnly = true,
@@ -150,6 +151,8 @@ namespace OneNoteAI.UI
                 ScrollBars = RichTextBoxScrollBars.Vertical
             };
             contentCard.Controls.Add(_rtbResult);
+            _rtbResult.LinkClicked += (s, e) => DiagramPreviewDialog.Open(this, e.LinkText, _diagrams);
+            _rtbResult.SizeChanged += (s, e) => _dirty = true;
             contentWrapper.Controls.Add(contentCard);
 
             // ── Button panel (OneNote-style action bar) ──
@@ -349,19 +352,9 @@ namespace OneNoteAI.UI
 
             try
             {
-                _rtbResult.Clear();
-
-                string normalized = markdown.Replace("\r\n", "\n").Replace('\r', '\n');
-                string[] lines = normalized.Split('\n');
-
-                for (int i = 0; i < lines.Length; i++)
-                {
-                    AppendFormattedLine(lines[i]);
-                    if (i < lines.Length - 1)
-                    {
-                        _rtbResult.AppendText(Environment.NewLine);
-                    }
-                }
+                _diagrams.Clear();
+                _rtbResult.Rtf = MarkdownRtf.Render(markdown, _rtbResult.Font, MarkdownRtf.AvailableWidth(_rtbResult),
+                    Settings.SettingsManager.Current.Knowledge.EnableDiagramPreview ? _diagrams : null);
             }
             finally
             {
@@ -371,7 +364,7 @@ namespace OneNoteAI.UI
 
                 if (wasAtBottom || _streamComplete)
                 {
-                    _rtbResult.SelectionStart = _rtbResult.TextLength;
+                    _rtbResult.SelectionStart = RichTextView.Length(_rtbResult);
                     _rtbResult.SelectionLength = 0;
                     _rtbResult.ScrollToCaret();
                 }
@@ -387,125 +380,12 @@ namespace OneNoteAI.UI
             try
             {
                 int firstVisible = _rtbResult.GetCharIndexFromPosition(new Point(2, _rtbResult.ClientSize.Height - 4));
-                return (_rtbResult.TextLength - firstVisible) < (_rtbResult.ClientSize.Height); // crude but safe
+                return (RichTextView.Length(_rtbResult) - firstVisible) < (_rtbResult.ClientSize.Height); // crude but safe
             }
             catch
             {
                 return true;
             }
-        }
-
-        private void AppendFormattedLine(string line)
-        {
-            string safeLine = line ?? string.Empty;
-            string trimmed = safeLine.TrimStart();
-
-            if (trimmed.Length == 0)
-            {
-                return;
-            }
-
-            Match headingMatch = Regex.Match(trimmed, "^(#{1,3})\\s+(.*)$");
-            if (headingMatch.Success)
-            {
-                int level = headingMatch.Groups[1].Value.Length;
-                float size = level == 1 ? 16F : level == 2 ? 14F : 12F;
-                AppendInlineFormattedText(headingMatch.Groups[2].Value, new Font("Microsoft YaHei UI", size, FontStyle.Bold, GraphicsUnit.Point), Color.FromArgb(128, 57, 123));
-                return;
-            }
-
-            Match numberedMatch = Regex.Match(trimmed, "^(\\d+)\\.\\s+(.*)$");
-            if (numberedMatch.Success)
-            {
-                AppendBulletPrefix(numberedMatch.Groups[1].Value + ". ", false);
-                AppendInlineFormattedText(numberedMatch.Groups[2].Value, new Font("Microsoft YaHei UI", 10F, FontStyle.Regular, GraphicsUnit.Point), Color.Black);
-                return;
-            }
-
-            Match bulletMatch = Regex.Match(trimmed, "^[-•]\\s+(.*)$");
-            if (bulletMatch.Success)
-            {
-                AppendBulletPrefix("• ", true);
-                AppendInlineFormattedText(bulletMatch.Groups[1].Value, new Font("Microsoft YaHei UI", 10F, FontStyle.Regular, GraphicsUnit.Point), Color.Black);
-                return;
-            }
-
-            AppendInlineFormattedText(safeLine, new Font("Microsoft YaHei UI", 10F, FontStyle.Regular, GraphicsUnit.Point), Color.Black);
-        }
-
-        private void AppendBulletPrefix(string prefix, bool highlight)
-        {
-            Font font = new Font("Microsoft YaHei UI", 10F, FontStyle.Bold, GraphicsUnit.Point);
-            Color color = highlight ? Color.FromArgb(128, 57, 123) : Color.FromArgb(100, 90, 110);
-
-            _rtbResult.SelectionStart = _rtbResult.TextLength;
-            _rtbResult.SelectionLength = 0;
-            using (Font scaledFont = CreateDpiFont(font))
-            {
-                _rtbResult.SelectionFont = scaledFont;
-            }
-            _rtbResult.SelectionColor = color;
-            _rtbResult.AppendText(prefix);
-        }
-
-        private void AppendInlineFormattedText(string text, Font baseFont, Color baseColor)
-        {
-            string input = text ?? string.Empty;
-
-            if (input.Length == 0)
-            {
-                return;
-            }
-
-            Regex regex = new Regex("(\\*\\*.+?\\*\\*|\\*.+?\\*)");
-            MatchCollection matches = regex.Matches(input);
-            int currentIndex = 0;
-
-            foreach (Match match in matches)
-            {
-                if (match.Index > currentIndex)
-                {
-                    AppendSegment(input.Substring(currentIndex, match.Index - currentIndex), baseFont, baseColor);
-                }
-
-                string value = match.Value;
-                if (value.StartsWith("**", StringComparison.Ordinal) && value.EndsWith("**", StringComparison.Ordinal) && value.Length >= 4)
-                {
-                    AppendSegment(value.Substring(2, value.Length - 4), new Font(baseFont, baseFont.Style | FontStyle.Bold), baseColor);
-                }
-                else if (value.StartsWith("*", StringComparison.Ordinal) && value.EndsWith("*", StringComparison.Ordinal) && value.Length >= 2)
-                {
-                    AppendSegment(value.Substring(1, value.Length - 2), new Font(baseFont, baseFont.Style | FontStyle.Italic), baseColor);
-                }
-                else
-                {
-                    AppendSegment(value, baseFont, baseColor);
-                }
-
-                currentIndex = match.Index + match.Length;
-            }
-
-            if (currentIndex < input.Length)
-            {
-                AppendSegment(input.Substring(currentIndex), baseFont, baseColor);
-            }
-        }
-
-        private void AppendSegment(string text, Font font, Color color)
-        {
-            if (string.IsNullOrEmpty(text))
-            {
-                return;
-            }
-
-            _rtbResult.SelectionStart = _rtbResult.TextLength;
-            _rtbResult.SelectionLength = 0;
-            using (Font scaledFont = CreateDpiFont(font))
-            {
-                _rtbResult.SelectionFont = scaledFont;
-            }
-            _rtbResult.SelectionColor = color;
-            _rtbResult.AppendText(text);
         }
 
         private void OnInsertClick(object sender, EventArgs e)

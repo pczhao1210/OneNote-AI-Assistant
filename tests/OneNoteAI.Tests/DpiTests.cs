@@ -60,7 +60,11 @@ internal static class DpiTests
                     CheckDialog(new McpServerDialog(server));
                     CheckDialog(new McpToolsDialog(server));
                     using (var store = new IndexStore(Path.Combine(root, "dpi-" + language)))
-                        CheckDialog(new KnowledgeDialog(new FakeNotes(), store, () => "p1"));
+                    {
+                        var chat = new KnowledgeDialog(new FakeNotes(), store, () => "p1");
+                        ChatUiTests.SeedPreview(chat);
+                        CheckDialog(chat);
+                    }
                 }
             });
 
@@ -80,7 +84,7 @@ internal static class DpiTests
         int count = 0;
         foreach (string name in assembly.GetManifestResourceNames())
         {
-            if (!name.StartsWith("OneNoteAI.Ribbon.Icons.", StringComparison.Ordinal)) continue;
+            if (!name.StartsWith("OneNoteAI.Ribbon.Icons.", StringComparison.Ordinal) || !name.EndsWith(".png", StringComparison.Ordinal)) continue;
             using (var stream = assembly.GetManifestResourceStream(name))
             using (Image image = Image.FromStream(stream))
             {
@@ -89,6 +93,15 @@ internal static class DpiTests
             }
         }
         Assert(count == 10, "All ten high-resolution ribbon images are embedded.");
+        foreach (int size in new[] { 16, 24, 32, 48, 64, 128 })
+            using (var stream = assembly.GetManifestResourceStream("OneNoteAI.Ribbon.Icons.QA.ico"))
+            using (var icon = new Icon(stream, size, size))
+            using (var bitmap = icon.ToBitmap())
+            {
+                Assert(bitmap.Size == new Size(size, size), "Q&A window icon conversion at " + size + " pixels.");
+                Assert(bitmap.GetPixel(0, 0).A == 0 && bitmap.GetPixel(size / 2, size / 3).A > 0,
+                    "Q&A icon transparency/artwork at " + size + " pixels.");
+            }
     }
 
     private static void CheckNativeMonitorMoves()
@@ -229,6 +242,13 @@ internal static class DpiTests
         }
 
         TreeView tree = Find<TreeView>(form);
+        if (form is KnowledgeDialog)
+        {
+            var transcript = Find<RichTextBox>(form);
+            Assert(transcript.GetPositionFromCharIndex(transcript.TextLength - 1).Y >= 0 &&
+                transcript.GetPositionFromCharIndex(0).Y < transcript.ClientSize.Height,
+                "Chat transcript scrolled past all content after reflow at " + dpi + ".");
+        }
         if (form is HelpDialog) Assert(tree.ItemHeight == (int)Math.Round(26 * scale), "Help tree row height.");
         if (form is ResultDialog)
         {

@@ -270,7 +270,7 @@ namespace OneNoteAI.AddIn
                 case "btnGenerate": return zh ? "生成内容" : "Generate Content";
                 case "btnTemplate": return zh ? "模板生成" : "Template Generation";
                 case "btnRewrite": return zh ? "智能改写" : "AI Rewrite";
-                case "btnQA": return zh ? "语义 + OneNote 搜索、知识问答与远程 MCP" : "Semantic + OneNote search, grounded Q&A and remote MCP";
+                case "btnQA": return zh ? "优先依据所选文档回答，必要时通过 MCP 补充" : "Answer from selected documents first; use MCP only when needed";
                 case "btnTranslate": return zh ? "智能翻译" : "AI Translate";
                 case "btnTag": return zh ? "自动标签" : "Auto Tag";
                 case "btnExtractTodos": return zh ? "提取待办" : "Extract Todos";

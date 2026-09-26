@@ -8,12 +8,17 @@ namespace OneNoteAI.Settings
 {
     public sealed class KnowledgeOptions
     {
+        public const int DefaultMaxRetrievedChunks = 16;
+        public const int MaxRetrievedChunksLimit = 100;
+
         public EmbeddingOptions Embedding { get; set; } = new EmbeddingOptions();
         public List<string> AllowedRootIds { get; set; } = new List<string>();
         public List<McpServerOptions> Servers { get; set; } = new List<McpServerOptions>();
         public int ContextWindow { get; set; }
+        public int MaxRetrievedChunks { get; set; } = DefaultMaxRetrievedChunks;
         public bool ModelSupportsTools { get; set; } = true;
         public bool AutomaticIndexing { get; set; }
+        public bool EnableDiagramPreview { get; set; }
 
         public KnowledgeOptions Clone() => JsonConvert.DeserializeObject<KnowledgeOptions>(JsonConvert.SerializeObject(this));
 
@@ -22,9 +27,16 @@ namespace OneNoteAI.Settings
             Embedding.Validate(false);
             if (AllowedRootIds == null || Servers == null) throw new InvalidOperationException("Invalid knowledge settings.");
             if (ContextWindow != 0 && ContextWindow < 2048) throw new InvalidOperationException("Context window must be at least 2048.");
+            ValidateMaxRetrievedChunks(MaxRetrievedChunks);
             if (Servers.Select(s => s.Id).Distinct(StringComparer.Ordinal).Count() != Servers.Count)
                 throw new InvalidOperationException("Duplicate MCP server IDs.");
             foreach (McpServerOptions server in Servers) server.Validate();
+        }
+
+        internal static void ValidateMaxRetrievedChunks(int count)
+        {
+            if (count < 1 || count > MaxRetrievedChunksLimit)
+                throw new InvalidOperationException("Retrieved passage count must be between 1 and " + MaxRetrievedChunksLimit + ".");
         }
     }
 

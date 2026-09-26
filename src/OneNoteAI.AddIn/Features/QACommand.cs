@@ -19,7 +19,7 @@ namespace OneNoteAI.Features
             }
             catch (Exception ex)
             {
-                Logger.Error("Knowledge assistant could not open: " + ex.GetType().Name);
+                Logger.Error("Q&A assistant could not open: " + ex.GetType().Name + Environment.NewLine + ex.StackTrace);
                 Msg.Show(ex.Message, "OneNote AI Assistant", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }

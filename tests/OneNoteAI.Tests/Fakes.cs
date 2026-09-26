@@ -210,12 +210,22 @@ namespace OneNoteAI.Tests
     internal sealed class StalledStream : Stream
     {
         private readonly TaskCompletionSource<int> _read = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly byte[] _prefix;
+        private int _offset;
+        public StalledStream(byte[] prefix = null) { _prefix = prefix ?? Array.Empty<byte>(); }
         public override bool CanRead => true;
         public override bool CanSeek => false;
         public override bool CanWrite => false;
         public override long Length => throw new NotSupportedException();
         public override long Position { get => 0; set => throw new NotSupportedException(); }
-        public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken token) => _read.Task;
+        public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken token)
+        {
+            int length = Math.Min(count, _prefix.Length - _offset);
+            if (length == 0) return _read.Task;
+            Array.Copy(_prefix, _offset, buffer, offset, length);
+            _offset += length;
+            return Task.FromResult(length);
+        }
         protected override void Dispose(bool disposing) { _read.TrySetException(new ObjectDisposedException(nameof(StalledStream))); base.Dispose(disposing); }
         public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
         public override void Flush() { }

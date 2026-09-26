@@ -30,6 +30,9 @@ namespace OneNoteAI.Knowledge
         public async Task<RetrievalResult> SearchAsync(string question, IEnumerable<string> selectedRoots,
             KnowledgeOptions options, CancellationToken token, EmbeddingClient embeddings = null)
         {
+            int maxChunks = options.MaxRetrievedChunks;
+            KnowledgeOptions.ValidateMaxRetrievedChunks(maxChunks);
+            int candidateCount = Math.Max(40, maxChunks);
             NoteNode hierarchy = _source.Hierarchy();
             HashSet<string> allowed = NoteNode.Sections(hierarchy, options.AllowedRootIds);
             HashSet<string> sections = NoteNode.Sections(hierarchy, selectedRoots);
@@ -52,7 +55,7 @@ namespace OneNoteAI.Knowledge
                     }
                     var client = embeddings ?? new EmbeddingClient(options.Embedding);
                     float[][] query = await client.EmbedAsync(new[] { question }, token).ConfigureAwait(false);
-                    return _vectors.Search(query[0], sections, generation, 40, token, Warn);
+                    return _vectors.Search(query[0], sections, generation, candidateCount, token, Warn);
                 }
                 catch (OperationCanceledException) when (token.IsCancellationRequested) { throw; }
                 catch (Exception ex)
@@ -86,7 +89,7 @@ namespace OneNoteAI.Knowledge
                             NoteNode state = snapshot.State;
                             if (state.Unavailable || !sections.Contains(state.SectionId)) continue;
                             matches.AddRange(NoteChunker.Split(snapshot.Page, state));
-                            matches = matches.OrderByDescending(c => KeywordScore(question, c)).ThenBy(c => c.Id, StringComparer.Ordinal).Take(40).ToList();
+                            matches = matches.OrderByDescending(c => KeywordScore(question, c)).ThenBy(c => c.Id, StringComparer.Ordinal).Take(candidateCount).ToList();
                         }
                         catch (Exception ex) when (ex is COMException || ex is InvalidOperationException)
                         { Warn("A OneNote Search result is inaccessible or changed: " + ex.Message); }
@@ -97,7 +100,7 @@ namespace OneNoteAI.Knowledge
             Task<List<NoteChunk>> semantic = Semantic();
             Task<List<NoteChunk>> native = Task.Run(Native, token);
             await Task.WhenAll(semantic, native).ConfigureAwait(false);
-            List<NoteChunk> fused = Fuse(await semantic.ConfigureAwait(false), await native.ConfigureAwait(false));
+            List<NoteChunk> fused = Fuse(maxChunks, await semantic.ConfigureAwait(false), await native.ConfigureAwait(false));
             var verified = new Dictionary<string, Dictionary<string, NoteChunk>>(StringComparer.Ordinal);
             foreach (NoteChunk candidate in fused)
             {
@@ -120,20 +123,22 @@ namespace OneNoteAI.Knowledge
                 }
                 if (current.TryGetValue(candidate.Id, out NoteChunk fresh) && fresh.Hash == candidate.Hash)
                     result.Chunks.Add(fresh);
-                if (result.Chunks.Count == 16) break;
+                if (result.Chunks.Count >= maxChunks) break;
             }
             if (result.Coverage.Pending > 0) Warn("Semantic coverage is incomplete; " + result.Coverage.Pending + " page(s) are not indexed at the current version/model.");
             if (result.Chunks.Count == 0) Warn("No verified passages found. This is not evidence that the whole notebook has no answer.");
             return result;
         }
 
-        public RetrievalResult CurrentPage(string pageId, string question, CancellationToken token)
+        public RetrievalResult CurrentPage(string pageId, string question, CancellationToken token,
+            int maxChunks = KnowledgeOptions.DefaultMaxRetrievedChunks)
         {
+            KnowledgeOptions.ValidateMaxRetrievedChunks(maxChunks);
             var snapshot = NoteReader.ReadStable(_source, pageId, token);
             var chunks = NoteChunker.Split(snapshot.Page, snapshot.State);
             var result = new RetrievalResult { Pages = new Dictionary<string, NoteNode> { [pageId] = snapshot.State },
-                Chunks = chunks.OrderByDescending(c => KeywordScore(question, c)).Take(16).ToList() };
-            if (chunks.Count > 16) result.Warnings.Add("Only selected passages of this long page are included, not a full-page review.");
+                Chunks = chunks.OrderByDescending(c => KeywordScore(question, c)).Take(maxChunks).ToList() };
+            if (chunks.Count > maxChunks) result.Warnings.Add("Only " + maxChunks + " selected passages of this long page are included, not a full-page review.");
             return result;
         }
 
@@ -148,7 +153,10 @@ namespace OneNoteAI.Knowledge
             return (snapshot.State, current);
         }
 
-        public static List<NoteChunk> Fuse(params List<NoteChunk>[] rankings)
+        public static List<NoteChunk> Fuse(params List<NoteChunk>[] rankings) =>
+            Fuse(KnowledgeOptions.DefaultMaxRetrievedChunks, rankings);
+
+        private static List<NoteChunk> Fuse(int maxChunks, params List<NoteChunk>[] rankings)
         {
             var scores = new Dictionary<string, (NoteChunk Chunk, double Score)>(StringComparer.Ordinal);
             foreach (List<NoteChunk> ranking in rankings)
@@ -160,7 +168,7 @@ namespace OneNoteAI.Knowledge
                 }
             var used = new HashSet<string>(StringComparer.Ordinal);
             var counts = new Dictionary<string, int>(StringComparer.Ordinal);
-            int perPage = Math.Max(2, 16 / Math.Max(1, scores.Values.Select(p => p.Chunk.PageId).Distinct().Count()));
+            int perPage = Math.Max(2, maxChunks / Math.Max(1, scores.Values.Select(p => p.Chunk.PageId).Distinct().Count()));
             var result = new List<NoteChunk>();
             foreach (var item in scores.Values.OrderByDescending(p => p.Score).ThenBy(p => p.Chunk.Id, StringComparer.Ordinal))
             {
