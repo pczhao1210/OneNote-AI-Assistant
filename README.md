@@ -41,6 +41,18 @@ This plugin connects to DeepSeek, OpenAI, Ollama, or any OpenAI-compatible API, 
 - [.NET Framework 4.8](https://dotnet.microsoft.com/download/dotnet-framework/net48)
 - API key from your chosen provider (not required for Ollama)
 
+### High-DPI displays
+
+Add-in dialogs render text and controls at the display's native DPI, including
+4K displays at 150%, 200% or 300% scaling. Moving a dialog between monitors
+updates its layout and fonts. Per-monitor V2 support requires Windows 10
+version 1703 or later (including Windows 11); version 1607 uses per-monitor V1,
+and older versions retain the host's DPI mode with a warning in the add-in log.
+This applies only to the add-in's UI thread, without changing OneNote's DPI
+settings or modifying `OneNote.exe.config` / `dllhost.exe.config`.
+Ribbon icons use 128-pixel source artwork instead of enlarged 32-pixel images.
+After installing an updated build, fully exit and restart OneNote.
+
 ## Installation
 
 1. **Build** (Visual Studio 2019+ or Build Tools):

@@ -45,6 +45,8 @@ namespace OneNoteAI.UI
 
         private static void ThreadProc()
         {
+            DpiSupport.InitializeThread();
+
             // Install a WinForms sync context so BeginInvoke/Invoke work.
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
@@ -70,7 +72,7 @@ namespace OneNoteAI.UI
                 _ready.Set();
             };
 
-            // HandleCreated triggers Load synchronously enough â€?but force it.
+            // Create the anchor handle before publishing the synchronization context.
             var handle = _pumpForm.Handle;
             GC.KeepAlive(handle);
             if (_syncContext == null)

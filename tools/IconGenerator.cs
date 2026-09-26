@@ -39,14 +39,9 @@ internal static class IconGenerator
             g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
             g.ScaleTransform(4f, 4f);
             draw(g);
-            using (var icon = new Bitmap(32, 32, PixelFormat.Format32bppArgb))
-            using (Graphics small = Graphics.FromImage(icon))
-            {
-                small.InterpolationMode = InterpolationMode.HighQualityBicubic;
-                small.CompositingQuality = CompositingQuality.HighQuality;
-                small.DrawImage(large, 0, 0, 32, 32);
-                icon.Save(Path.Combine(dir, name + ".png"), ImageFormat.Png);
-            }
+            // Keep the 4x artwork so Office can render high-DPI ribbon buttons
+            // without enlarging a 32-pixel bitmap.
+            large.Save(Path.Combine(dir, name + ".png"), ImageFormat.Png);
         }
     }
 

@@ -11,7 +11,7 @@ using OneNoteAI.Settings;
 
 namespace OneNoteAI.UI
 {
-    public class SettingsDialog : Form
+    public class SettingsDialog : DpiAwareForm
     {
         // API + Model tab
         private readonly TextBox _txtApiKey;

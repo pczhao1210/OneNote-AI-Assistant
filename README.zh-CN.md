@@ -41,6 +41,16 @@
 - [.NET Framework 4.8](https://dotnet.microsoft.com/download/dotnet-framework/net48)
 - AI 服务商的 API Key（Ollama 本地部署无需 Key）
 
+### 高 DPI 显示
+
+插件对话框按屏幕原生 DPI 绘制文字和控件，支持 4K 屏幕的 150%、200%、300%
+等缩放比例；窗口移到不同缩放比例的显示器时，会同步调整布局和字体。
+Per-Monitor V2 需要 Windows 10 1703 或更高版本（含 Windows 11）；
+1607 使用 Per-Monitor V1，更早版本保留宿主 DPI 模式并在插件日志中记录警告。
+适配仅作用于插件自己的 UI 线程，不改变 OneNote 的 DPI 设置，也不需要修改
+`OneNote.exe.config` 或 `dllhost.exe.config`。Ribbon 图标也使用 128 像素原图，
+而非放大 32 像素小图。安装更新后，请完全退出并重启 OneNote。
+
 ## 安装
 
 1. **编译插件**（Visual Studio 2019+ 或 Build Tools）：

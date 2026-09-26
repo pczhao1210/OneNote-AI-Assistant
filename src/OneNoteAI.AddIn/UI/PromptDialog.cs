@@ -4,7 +4,7 @@ using System.Windows.Forms;
 
 namespace OneNoteAI.UI
 {
-    public class PromptDialog : Form
+    public class PromptDialog : DpiAwareForm
     {
         private readonly Label _lblInstruction;
         private readonly TextBox _txtInput;

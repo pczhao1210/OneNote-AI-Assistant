@@ -6,7 +6,7 @@ using System.Windows.Forms;
 
 namespace OneNoteAI.UI
 {
-    public class ResultDialog : Form
+    public class ResultDialog : DpiAwareForm
     {
         // Win32 — used to suspend/resume painting of the RichTextBox while we
         // rebuild its content during streaming. Without this every token causes
@@ -166,7 +166,8 @@ namespace OneNoteAI.UI
             {
                 using (Pen pen = new Pen(Color.FromArgb(214, 211, 219)))
                 {
-                    pe.Graphics.DrawLine(pen, 16, 0, _buttonPanel.Width - 16, 0);
+                    int inset = ScaleLogical(16);
+                    pe.Graphics.DrawLine(pen, inset, 0, _buttonPanel.Width - inset, 0);
                 }
             };
 
@@ -439,7 +440,10 @@ namespace OneNoteAI.UI
 
             _rtbResult.SelectionStart = _rtbResult.TextLength;
             _rtbResult.SelectionLength = 0;
-            _rtbResult.SelectionFont = font;
+            using (Font scaledFont = CreateDpiFont(font))
+            {
+                _rtbResult.SelectionFont = scaledFont;
+            }
             _rtbResult.SelectionColor = color;
             _rtbResult.AppendText(prefix);
         }
@@ -496,7 +500,10 @@ namespace OneNoteAI.UI
 
             _rtbResult.SelectionStart = _rtbResult.TextLength;
             _rtbResult.SelectionLength = 0;
-            _rtbResult.SelectionFont = font;
+            using (Font scaledFont = CreateDpiFont(font))
+            {
+                _rtbResult.SelectionFont = scaledFont;
+            }
             _rtbResult.SelectionColor = color;
             _rtbResult.AppendText(text);
         }
@@ -568,17 +575,27 @@ namespace OneNoteAI.UI
 
         private void OnDialogResize(object sender, EventArgs e)
         {
-            int top = 13;
-            int right = _buttonPanel.ClientSize.Width - 20;
+            if (IsScalingForDpi) return;
+
+            int top = ScaleLogical(13);
+            int gap = ScaleLogical(8);
+            int right = _buttonPanel.ClientSize.Width - ScaleLogical(20);
 
             // Right-aligned: Close, Copy, Insert
             _btnClose.Location = new Point(right - _btnClose.Width, top);
-            _btnCopy.Location = new Point(_btnClose.Left - 8 - _btnCopy.Width, top);
-            _btnInsert.Location = new Point(_btnCopy.Left - 8 - _btnInsert.Width, top);
+            _btnCopy.Location = new Point(_btnClose.Left - gap - _btnCopy.Width, top);
+            _btnInsert.Location = new Point(_btnCopy.Left - gap - _btnInsert.Width, top);
 
             // Left-aligned: Regenerate, FollowUp
-            _btnRegenerate.Location = new Point(20, top);
-            _btnFollowUp.Location = new Point(_btnRegenerate.Right + 8, top);
+            _btnRegenerate.Location = new Point(ScaleLogical(20), top);
+            _btnFollowUp.Location = new Point(_btnRegenerate.Right + gap, top);
+        }
+
+        protected override void OnDpiScaleChanged(EventArgs e)
+        {
+            base.OnDpiScaleChanged(e);
+            OnDialogResize(this, e);
+            FlushRender();
         }
     }
 }

@@ -99,6 +99,8 @@
     <Compile Include="UI\ProgressOverlay.cs" />
     <Compile Include="UI\WindowWrapper.cs" />
     <Compile Include="UI\UiThread.cs" />
+    <Compile Include="UI\DpiSupport.cs" />
+    <Compile Include="UI\DpiAwareForm.cs" />
     <Compile Include="UI\Msg.cs" />
     <Compile Include="UI\ForceForeground.cs" />
     <Compile Include="UI\ScopeDialog.cs" />
