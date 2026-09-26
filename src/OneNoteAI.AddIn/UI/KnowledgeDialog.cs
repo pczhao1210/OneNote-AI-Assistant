@@ -19,7 +19,7 @@ using static OneNoteAI.UI.KnowledgeUi;
 
 namespace OneNoteAI.UI
 {
-    internal sealed class KnowledgeDialog : Form
+    internal sealed class KnowledgeDialog : DpiAwareForm
     {
         private readonly INoteSource _source;
         private readonly IndexStore _store;
@@ -274,7 +274,7 @@ namespace OneNoteAI.UI
                 else
                 {
                     ValidateExternalSource(source.Execution);
-                    using (var dialog = new Form { Text = source.ToString(), Size = new Size(840, 660), StartPosition = FormStartPosition.CenterParent })
+                    using (var dialog = new DpiAwareForm { Text = source.ToString(), Size = new Size(840, 660), StartPosition = FormStartPosition.CenterParent })
                     {
                         Theme.ApplyTo(dialog);
                         var content = new RichTextBox { Dock = DockStyle.Fill, ReadOnly = true, DetectUrls = true, Font = Theme.FontContent,

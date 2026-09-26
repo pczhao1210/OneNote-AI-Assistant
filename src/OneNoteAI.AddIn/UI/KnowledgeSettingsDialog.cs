@@ -13,7 +13,7 @@ using static OneNoteAI.UI.KnowledgeUi;
 
 namespace OneNoteAI.UI
 {
-    internal sealed class KnowledgeSettingsDialog : Form
+    internal sealed class KnowledgeSettingsDialog : DpiAwareForm
     {
         private readonly KnowledgeOptions _draft;
         private readonly TextBox _endpoint = new TextBox();
@@ -162,7 +162,7 @@ namespace OneNoteAI.UI
         }
     }
 
-    internal sealed class McpServerDialog : Form
+    internal sealed class McpServerDialog : DpiAwareForm
     {
         public McpServerOptions Server { get; }
         public McpServerDialog(McpServerOptions server)

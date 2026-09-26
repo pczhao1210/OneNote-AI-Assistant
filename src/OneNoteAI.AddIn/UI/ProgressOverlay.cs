@@ -5,7 +5,7 @@ using System.Windows.Forms;
 
 namespace OneNoteAI.UI
 {
-    public class ProgressOverlay : Form
+    public class ProgressOverlay : DpiAwareForm
     {
         private readonly CancellationTokenSource _cts = new CancellationTokenSource();
         private readonly Label _lblStatus;

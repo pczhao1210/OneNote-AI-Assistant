@@ -49,6 +49,7 @@ namespace OneNoteAI.Tests
             RedirectState();
             var tests = new List<(string Name, Func<Task> Run)>
             {
+                ("High-DPI dialogs and native font scaling", () => Sync(() => DpiTests.Run(_root))),
                 ("provider snapshots and isolated settings", SettingsAsync),
                 ("model parameter auto compatibility and overrides", ModelParametersAsync),
                 ("independent OneNote hierarchy and content revisions", PageRevisionsAsync),

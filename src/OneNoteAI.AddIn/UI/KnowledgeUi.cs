@@ -47,7 +47,7 @@ namespace OneNoteAI.UI
 
         public static void TextViewer(IWin32Window owner, string title, string text)
         {
-            using (var dialog = new Form { Text = title, Size = new Size(800, 620), StartPosition = FormStartPosition.CenterParent, MinimizeBox = false })
+            using (var dialog = new DpiAwareForm { Text = title, Size = new Size(800, 620), StartPosition = FormStartPosition.CenterParent, MinimizeBox = false })
             {
                 Theme.ApplyTo(dialog);
                 dialog.Controls.Add(new TextBox { Dock = DockStyle.Fill, Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Both,
@@ -62,7 +62,7 @@ namespace OneNoteAI.UI
             UiThread.Post(() =>
             {
                 if (token.IsCancellationRequested) { completion.TrySetCanceled(); return; }
-                using (var dialog = new Form { Text = L("批准 MCP 调用", "Approve MCP call"), Size = new Size(730, 580),
+                using (var dialog = new DpiAwareForm { Text = L("批准 MCP 调用", "Approve MCP call"), Size = new Size(730, 580),
                     StartPosition = FormStartPosition.CenterParent, MinimizeBox = false, MaximizeBox = false })
                 {
                     Theme.ApplyTo(dialog);

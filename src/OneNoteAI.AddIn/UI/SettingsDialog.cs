@@ -11,7 +11,7 @@ using OneNoteAI.Settings;
 
 namespace OneNoteAI.UI
 {
-    public class SettingsDialog : Form
+    public class SettingsDialog : DpiAwareForm
     {
         private readonly AppSettings _draft = SettingsManager.Snapshot();
         // API + Model tab

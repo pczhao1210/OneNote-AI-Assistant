@@ -59,6 +59,17 @@
 - [.NET Framework 4.8](https://dotnet.microsoft.com/download/dotnet-framework/net48)
 - AI 服务商的 API Key（Ollama 本地部署无需 Key）
 
+### 高 DPI 显示
+
+插件对话框按屏幕原生 DPI 绘制文字和控件，支持 4K 屏幕的 150%、200%、300%
+等缩放比例；窗口移到不同缩放比例的显示器时，会同步调整布局和字体。
+Per-Monitor V2 需要 Windows 10 1703 或更高版本（含 Windows 11）；
+1607 使用 Per-Monitor V1，更早版本保留宿主 DPI 模式并在插件日志中记录警告。
+适配仅作用于插件自己的 UI 线程，不改变 OneNote 的 DPI 设置，也不需要修改
+`OneNote.exe.config` 或 `dllhost.exe.config`。Ribbon 图标也使用 128 像素原图，
+而非放大 32 像素小图。知识助手、索引设置、MCP 连接与工具目录、审批和来源查看窗口
+同样适用。安装更新后，请完全退出并重启 OneNote。
+
 ## 安装
 
 1. 按下方开发者命令**编译并打包**，或获取可信的安装包。
@@ -198,6 +209,15 @@ src\OneNoteAI.AddIn
 msbuild .\OneNoteAI.sln -restore -p:RestoreLockedMode=true -p:Configuration=Release
 .\tests\OneNoteAI.Tests\bin\Release\OneNoteAI.Tests.exe
 ```
+
+仅运行 DPI 和界面回归场景（需要 Windows 10 1703 或更高版本）：
+
+```powershell
+.\tests\OneNoteAI.Tests\bin\Release\OneNoteAI.Tests.exe High-DPI WinForms
+```
+
+DPI 场景覆盖中英文窗口的 100%-300% 缩放、原生字体大小、表格表头和用户调整后的
+分栏宽度；还会在当前可用显示器之间移动隐藏测试窗口，检查原生 DPI 通知。
 
 测试使用合成笔记、HTTP 响应和隔离配置/缓存目录，不接触真实笔记、付费接口或远程写操作。覆盖配置草稿、解析、流式读取、范围、断点续建、原生工具循环、MCP 策略/OAuth 和 WinForms。ANN 用例包括各 5,000 个 1536/3072 维向量。可按场景名称过滤，例如 `OneNoteAI.Tests.exe MCP OAuth`。
 

@@ -9,7 +9,7 @@ namespace OneNoteAI.UI
     /// and right-side content panel. Uses TreeView + RichTextBox layout
     /// similar to traditional CHM help viewers.
     /// </summary>
-    public class HelpDialog : Form
+    public class HelpDialog : DpiAwareForm
     {
         private readonly TreeView _treeTopics;
         private readonly RichTextBox _rtbContent;
@@ -154,6 +154,17 @@ namespace OneNoteAI.UI
             _treeTopics.Nodes.Add(new TreeNode(zh ? "关于" : "About") { Tag = "about" });
         }
 
+        protected override void OnDpiScaleChanged(EventArgs e)
+        {
+            base.OnDpiScaleChanged(e);
+            _treeTopics.ItemHeight = ScaleLogical(26);
+            string topic = _treeTopics.SelectedNode?.Tag as string;
+            if (!string.IsNullOrEmpty(topic))
+            {
+                ShowTopic(topic);
+            }
+        }
+
         private void OnTopicSelected(object sender, TreeViewEventArgs e)
         {
             string tag = e.Node.Tag as string;
@@ -200,7 +211,10 @@ namespace OneNoteAI.UI
         {
             _rtbContent.SelectionStart = _rtbContent.TextLength;
             _rtbContent.SelectionLength = 0;
-            _rtbContent.SelectionFont = font;
+            using (Font scaledFont = CreateDpiFont(font))
+            {
+                _rtbContent.SelectionFont = scaledFont;
+            }
             _rtbContent.SelectionColor = color;
             _rtbContent.AppendText(text);
         }

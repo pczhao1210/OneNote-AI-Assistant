@@ -59,6 +59,20 @@ For the error “`max_tokens` is not supported; use `max_completion_tokens`”, 
 - [.NET Framework 4.8](https://dotnet.microsoft.com/download/dotnet-framework/net48)
 - API key from your chosen provider (not required for Ollama)
 
+### High-DPI displays
+
+Add-in dialogs render text and controls at the display's native DPI, including
+4K displays at 150%, 200% or 300% scaling. Moving a dialog between monitors
+updates its layout and fonts. Per-monitor V2 support requires Windows 10
+version 1703 or later (including Windows 11); version 1607 uses per-monitor V1,
+and older versions retain the host's DPI mode with a warning in the add-in log.
+This applies only to the add-in's UI thread, without changing OneNote's DPI
+settings or modifying `OneNote.exe.config` / `dllhost.exe.config`.
+Ribbon icons use 128-pixel source artwork instead of enlarged 32-pixel images.
+The same scaling applies to the knowledge assistant, index settings, MCP
+connections, tool catalogs, approval prompts and source viewers.
+After installing an updated build, fully exit and restart OneNote.
+
 ## Installation
 
 1. **Build and package** using the developer commands below, or obtain a trusted installer.
@@ -202,6 +216,16 @@ On Windows, install Visual Studio/Build Tools with .NET desktop development, des
 msbuild .\OneNoteAI.sln -restore -p:RestoreLockedMode=true -p:Configuration=Release
 .\tests\OneNoteAI.Tests\bin\Release\OneNoteAI.Tests.exe
 ```
+
+To run only the DPI and UI regression scenarios (Windows 10 1703+):
+
+```powershell
+.\tests\OneNoteAI.Tests\bin\Release\OneNoteAI.Tests.exe High-DPI WinForms
+```
+
+The DPI scenario covers English and Chinese dialogs at 100%-300% scaling,
+native font sizes, grid headers and user-resized splitters. It also moves a
+hidden test window between available monitors to check native DPI notifications.
 
 The executable suite uses synthetic notes, HTTP responses and isolated settings/cache directories, without real notes, paid API calls or remote writes. It covers provider drafts, parsing, streaming, scopes, resumable indexing, native tool loops, MCP policies/OAuth and WinForms. ANN cases include 5,000 vectors each at 1536 and 3072 dimensions. Arguments select scenario names, for example `OneNoteAI.Tests.exe MCP OAuth`.
 

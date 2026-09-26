@@ -13,13 +13,15 @@ using static OneNoteAI.UI.KnowledgeUi;
 
 namespace OneNoteAI.UI
 {
-    internal sealed class McpToolsDialog : Form
+    internal sealed class McpToolsDialog : DpiAwareForm
     {
         private readonly McpServerOptions _server;
         private readonly McpManager _manager;
         private readonly TabControl _tabs = new TabControl { Dock = DockStyle.Fill };
         private readonly DataGridView _tools = new DataGridView { Dock = DockStyle.Fill, AllowUserToAddRows = false, AllowUserToDeleteRows = false,
-            RowHeadersVisible = false, SelectionMode = DataGridViewSelectionMode.FullRowSelect, MultiSelect = false, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill };
+            RowHeadersVisible = false, SelectionMode = DataGridViewSelectionMode.FullRowSelect, MultiSelect = false,
+            AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, AutoSizeRowsMode = DataGridViewAutoSizeRowsMode.AllCells,
+            ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize };
         private readonly TextBox _arguments = new TextBox { Dock = DockStyle.Fill, Multiline = true, ScrollBars = ScrollBars.Vertical, Text = "{}" };
         private readonly ListBox _resources = new ListBox { Dock = DockStyle.Fill };
         private readonly ListBox _prompts = new ListBox { Dock = DockStyle.Fill };

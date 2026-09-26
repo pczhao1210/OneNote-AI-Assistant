@@ -10,7 +10,7 @@ namespace OneNoteAI.UI
     /// alone or on every page in the current section. Shown by features that
     /// support multi-page processing (Summarize, ExtractTodos).
     /// </summary>
-    public class ScopeDialog : Form
+    public class ScopeDialog : DpiAwareForm
     {
         private readonly RadioButton _rbPage;
         private readonly RadioButton _rbSection;
