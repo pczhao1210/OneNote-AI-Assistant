@@ -32,12 +32,13 @@ namespace OneNoteAI.UI
         private readonly KnowledgeScopeTree _scope = new KnowledgeScopeTree();
         private readonly ComboBox _mode = new ComboBox { Dock = DockStyle.Top, DropDownStyle = ComboBoxStyle.DropDownList };
         private readonly CheckedListBox _servers = new CheckedListBox { Dock = DockStyle.Bottom, Height = 120, CheckOnClick = true };
-        private readonly CheckBox _external = new CheckBox { Dock = DockStyle.Bottom, Height = 30, Text = L("启用所选 MCP 连接", "Use selected MCP servers") };
+        private readonly CheckBox _external = new CheckBox { Dock = DockStyle.Bottom, Height = 30, Text = L("允许按需使用 MCP", "MCP only when needed") };
         private readonly RichTextBox _answer = new RichTextBox { Dock = DockStyle.Fill, ReadOnly = true, DetectUrls = false,
             BackColor = Theme.BgCard, BorderStyle = BorderStyle.None, Font = Theme.FontContent };
         private readonly ListBox _sources = new ListBox { Dock = DockStyle.Bottom, Height = 150, HorizontalScrollbar = true };
         private readonly ListBox _activity = new ListBox { Dock = DockStyle.Fill, HorizontalScrollbar = true };
         private readonly TextBox _question = new TextBox { Dock = DockStyle.Fill, Multiline = true, ScrollBars = ScrollBars.Vertical, Font = Theme.FontContent };
+        private readonly Label _scopeSummary = new Label { Dock = DockStyle.Top, Height = 32, Padding = new Padding(4), AutoEllipsis = true };
         private readonly Label _status = new Label { Dock = DockStyle.Bottom, Height = 36, Padding = new Padding(8), AutoEllipsis = true };
         private readonly Button _ask = Theme.CreatePrimaryButton(L("提问", "Ask"));
         private readonly Button _find = Theme.CreateSecondaryButton(L("找资料", "Find passages"));
@@ -53,6 +54,7 @@ namespace OneNoteAI.UI
         private bool _closing;
         private bool _editingSettings;
         private bool _pendingReset;
+        private bool _hasAllowedScope;
         private int _viewEpoch;
         private NoteNode _hierarchy;
         private KnowledgeAnswer _lastAnswer;
@@ -62,7 +64,7 @@ namespace OneNoteAI.UI
             _source = source ?? new OneNoteSource();
             _store = store ?? new IndexStore();
             _currentPageId = currentPageId ?? (() => new OneNoteProvider().GetCurrentPageId());
-            Text = L("OneNote 知识助手", "OneNote knowledge assistant");
+            Text = "OneNote " + Strings.BtnQA;
             Size = new Size(1100, 790);
             MinimumSize = new Size(920, 660);
             StartPosition = FormStartPosition.CenterScreen;
@@ -76,7 +78,8 @@ namespace OneNoteAI.UI
             split.Panel1.Padding = new Padding(8);
             split.Panel2.Padding = new Padding(8);
             _mode.Items.AddRange(new object[] { L("当前页面（不建索引）", "Current page (no indexing)"), L("选定笔记范围", "Selected note scope"), L("不读取笔记", "Do not read notes") });
-            _mode.SelectedIndex = 0;
+            _hasAllowedScope = SettingsManager.Current.Knowledge?.AllowedRootIds?.Count > 0;
+            _mode.SelectedIndex = _hasAllowedScope ? 1 : 0;
             split.Panel1.Controls.Add(_scope);
             split.Panel1.Controls.Add(_mode);
             split.Panel1.Controls.Add(_external);
@@ -89,6 +92,7 @@ namespace OneNoteAI.UI
             activityTab.Controls.Add(_activity);
             _tabs.TabPages.AddRange(new[] { answerTab, activityTab });
             split.Panel2.Controls.Add(_tabs);
+            split.Panel2.Controls.Add(_scopeSummary);
             var compose = new Panel { Dock = DockStyle.Bottom, Height = 152, Padding = new Padding(8) };
             var send = new FlowLayoutPanel { Dock = DockStyle.Right, Width = 130, FlowDirection = FlowDirection.TopDown, WrapContents = false };
             _ask.Width = _find.Width = _stop.Width = 120;
@@ -156,6 +160,7 @@ namespace OneNoteAI.UI
             };
             SettingsManager.SettingsChanged += SettingsChanged;
             SetBusy(false);
+            UpdateScopeSummary();
         }
 
         private void Populate()
@@ -164,18 +169,37 @@ namespace OneNoteAI.UI
             _loading = true;
             try
             {
+                bool hasAllowedScope = options.AllowedRootIds.Count > 0;
+                if (!_hasAllowedScope && hasAllowedScope) _mode.SelectedIndex = 1;
+                _hasAllowedScope = hasAllowedScope;
                 List<string> selected = _scope.CheckedRoots;
                 _scope.Populate(_hierarchy, selected.Count == 0 ? options.AllowedRootIds : selected, NoteNode.Sections(_hierarchy, options.AllowedRootIds));
                 var checkedServers = _servers.CheckedItems.Cast<McpServerOptions>().Select(s => s.Id).ToHashSet();
                 _servers.Items.Clear();
                 foreach (McpServerOptions server in options.Servers.Where(s => s.Enabled)) _servers.Items.Add(server, checkedServers.Count == 0 || checkedServers.Contains(server.Id));
-                _status.Text = L("当前页问答无需 Embedding；跨页语义检索请先授权范围并更新索引。MCP 默认不启用。",
-                    "Current-page QA needs no Embeddings. For cross-page semantic search, authorize a scope and update the index. MCP is off by default.");
+                _status.Text = L("文档优先回答，MCP 默认关闭、启用后按需使用。当前页无需索引；跨页语义检索需授权并更新索引。",
+                    "Documents first; MCP is off by default and used only when needed. Current page needs no index; cross-page semantic search needs consent and indexing.");
+                UpdateScopeSummary();
             }
             finally { _loading = false; }
         }
 
         private string CurrentPage() => _mode.SelectedIndex == 0 ? _currentPageId() : _mode.SelectedIndex == 2 ? "" : null;
+
+        private string ScopeDescription()
+        {
+            if (_mode.SelectedIndex == 0) return L("当前页面（仅此页，不检索其他页面）", "Current page only (no other pages)");
+            if (_mode.SelectedIndex == 2) return L("不读取笔记", "Do not read notes");
+            if (_hierarchy == null) return L("选定笔记范围（正在读取目录）", "Selected note scope (loading hierarchy)");
+            HashSet<string> sections = NoteNode.Sections(_hierarchy, _scope.CheckedRoots);
+            sections.IntersectWith(NoteNode.Sections(_hierarchy, SettingsManager.Current.Knowledge.AllowedRootIds));
+            if (sections.Count == 0) return L("选定笔记范围（尚未选择可访问的授权分区）", "Selected note scope (no accessible authorized section selected)");
+            int pages = _hierarchy.DescendantsAndSelf().Count(n => n.Kind == "Page" && !n.Unavailable && sections.Contains(n.SectionId));
+            return L("选定范围：", "Selected scope: ") + sections.Count + L(" 个分区 / ", " section(s) / ") +
+                pages + L(" 个可访问页面", " accessible page(s)");
+        }
+
+        private void UpdateScopeSummary() => _scopeSummary.Text = L("检索范围：", "Search scope: ") + ScopeDescription();
 
         private async Task AskAsync()
         {
@@ -186,7 +210,8 @@ namespace OneNoteAI.UI
             List<string> servers = _external.Checked ? _servers.CheckedItems.Cast<McpServerOptions>().Select(s => s.Id).ToList() : new List<string>();
             _lastAnswer = null;
             _sources.Items.Clear();
-            _answer.AppendText((_answer.TextLength == 0 ? "" : "\n\n") + L("问：", "Q: ") + question + "\n\n");
+            _answer.AppendText((_answer.TextLength == 0 ? "" : "\n\n") + L("问：", "Q: ") + question + "\n" +
+                L("本轮范围：", "Scope for this turn: ") + ScopeDescription() + "\n\n");
             _tabs.SelectedIndex = 0;
             int epoch = _viewEpoch;
             IProgress<string> text = new Progress<string>(part => { if (!IsDisposed && epoch == _viewEpoch) { _answer.AppendText(part); _answer.SelectionStart = _answer.TextLength; _answer.ScrollToCaret(); } });
@@ -215,13 +240,15 @@ namespace OneNoteAI.UI
             {
                 string page = CurrentPage();
                 RetrievalResult result = await Task.Run(() => page == null ? _retrieval.SearchAsync(query, roots, options, token) :
-                    Task.FromResult(_retrieval.CurrentPage(page, query, token)), token);
+                    Task.FromResult(_retrieval.CurrentPage(page, query, token, options.MaxRetrievedChunks)), token);
                 List<EvidenceSource> sources = result.Chunks.Select(_conversation.Evidence.Add).ToList();
                 ShowSources(sources);
-                _answer.Text = string.Join("\n\n", sources.Select(s => s + "\n" + s.Text));
+                _answer.Text = L("本轮范围：", "Scope for this turn: ") + ScopeDescription() + "\n\n" +
+                    string.Join("\n\n", sources.Select(s => s + "\n" + s.Text));
                 foreach (string warning in result.Warnings) _answer.AppendText("\n\n" + warning);
                 _tabs.SelectedIndex = 0;
-                _status.Text = L("找到片段：", "Passages: ") + sources.Count + "   " + L("语义索引页：", "Indexed pages: ") + result.Coverage.Indexed + "/" + result.Coverage.Total;
+                _status.Text = L("仅检索，未调用聊天模型。片段：", "Search only, no chat model call. Passages: ") + sources.Count + "   " +
+                    L("语义索引页：", "Indexed pages: ") + result.Coverage.Indexed + "/" + result.Coverage.Total;
             });
         }
 
@@ -321,7 +348,7 @@ namespace OneNoteAI.UI
                             text.AppendLine(uri);
                     }
                 }
-                new PageWriter().AppendOutline(provider.GetCurrentPageId(), text.ToString(), L("AI 知识问答", "AI knowledge answer"), links);
+                new PageWriter().AppendOutline(provider.GetCurrentPageId(), text.ToString(), L("AI 问答", "AI Q&A"), links);
                 _status.Text = L("已保存到当前页面；下次索引更新会正常处理此页。", "Saved to the current page; the next index update will process it normally.");
             }
             catch (Exception ex) { MessageBox.Show(this, ex.Message, Text, MessageBoxButtons.OK, MessageBoxIcon.Error); }
@@ -355,6 +382,7 @@ namespace OneNoteAI.UI
         private void ResetConversation()
         {
             if (_loading) return;
+            UpdateScopeSummary();
             _viewEpoch++;
             _conversation.Clear();
             _answer.Clear();

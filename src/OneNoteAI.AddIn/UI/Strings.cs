@@ -49,7 +49,7 @@ namespace OneNoteAI.UI
         public static string BtnGenerate      { get { return IsChinese ? "生成" : "Generate"; } }
         public static string BtnTemplate      { get { return IsChinese ? "模板" : "Template"; } }
         public static string BtnRewrite       { get { return IsChinese ? "改写" : "Rewrite"; } }
-        public static string BtnQA            { get { return IsChinese ? "知识助手" : "Knowledge"; } }
+        public static string BtnQA            { get { return IsChinese ? "问答助手" : "Q&A Assistant"; } }
         public static string BtnTranslate     { get { return IsChinese ? "翻译" : "Translate"; } }
         public static string BtnTag           { get { return IsChinese ? "标签" : "Tag"; } }
         public static string BtnExtractTodos  { get { return IsChinese ? "提取待办" : "Todos"; } }

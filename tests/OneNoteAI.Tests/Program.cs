@@ -61,6 +61,8 @@ namespace OneNoteAI.Tests
                 ("Claude native tool messages", ClaudeToolsAsync),
                 ("embedding presets, ordering and validation", EmbeddingsAsync),
                 ("scope expansion and duplicate names", ScopeAsync),
+                ("retrieval limit settings and persistence", RetrievalLimitSettingsAsync),
+                ("configurable current-page and hybrid retrieval limits", RetrievalLimitsAsync),
                 ("SQLite incremental indexing and model isolation", IndexingAsync),
                 ("durable embedding batch recovery", ResumeAsync),
                 ("index consent revocation", ConsentAsync),
@@ -78,6 +80,11 @@ namespace OneNoteAI.Tests
                 ("OAuth encrypted token cache", TokenCacheAsync),
                 ("OAuth discovery, PKCE, refresh and state validation", OAuthProtocolAsync),
                 ("fresh multi-turn evidence and scope reset", ConversationAsync),
+                ("selected-scope defaults and cross-page UI routing", ScopeRoutingAsync),
+                ("document-first answers avoid remote MCP discovery", DocumentFirstAsync),
+                ("document-first prompts fit small context windows", AssistantBudgetAsync),
+                ("MCP discovery requires an explicit reason", DiscoveryReasonAsync),
+                ("on-demand MCP failure preserves document evidence", DiscoveryFailureAsync),
                 ("native model-MCP-model loop", ToolLoopAsync),
                 ("WinForms layout and follow-up cancellation", UiAsync)
             };
@@ -557,6 +564,140 @@ namespace OneNoteAI.Tests
             }
         }
 
+        private static async Task RetrievalLimitSettingsAsync()
+        {
+            Equal(16, new KnowledgeOptions().MaxRetrievedChunks);
+            Equal(16, JsonConvert.DeserializeObject<KnowledgeOptions>("{}").MaxRetrievedChunks, "Legacy settings lost the default");
+            var options = new KnowledgeOptions { MaxRetrievedChunks = 48 };
+            Equal(48, options.Clone().MaxRetrievedChunks);
+            foreach (int invalid in new[] { -1, 0, 101 })
+            {
+                options.MaxRetrievedChunks = invalid;
+                await ThrowsAsync<InvalidOperationException>(() => Sync(options.Validate));
+            }
+            foreach (int valid in new[] { 1, 16, 100 })
+            {
+                options.MaxRetrievedChunks = valid;
+                options.Validate();
+            }
+            AppSettings original = Settings();
+            SetStatic(typeof(SettingsManager), "_current", original);
+            try
+            {
+                UiThread.Send(() =>
+                {
+                    using (var dialog = new KnowledgeSettingsDialog(new FakeNotes().Hierarchy()))
+                    {
+                        var limit = (NumericUpDown)typeof(KnowledgeSettingsDialog)
+                            .GetField("_retrievedChunks", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(dialog);
+                        Equal(1m, limit.Minimum);
+                        Equal(100m, limit.Maximum);
+                        Equal(16m, limit.Value);
+                        limit.Value = 48;
+                    }
+                    Equal(16, SettingsManager.Current.Knowledge.MaxRetrievedChunks, "Cancelled settings changed the active limit");
+                    using (var dialog = new KnowledgeSettingsDialog(new FakeNotes().Hierarchy()))
+                    {
+                        var limit = (NumericUpDown)typeof(KnowledgeSettingsDialog)
+                            .GetField("_retrievedChunks", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(dialog);
+                        limit.Value = 48;
+                        Button save = dialog.Controls.OfType<FlowLayoutPanel>().Single().Controls.OfType<Button>().Single(b => b.Text == "Save settings");
+                        typeof(Button).GetMethod("OnClick", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(save, new object[] { EventArgs.Empty });
+                    }
+                    Equal(48, SettingsManager.Current.Knowledge.MaxRetrievedChunks, "Save did not apply the limit");
+                    SettingsManager.Load();
+                    Equal(48, SettingsManager.Current.Knowledge.MaxRetrievedChunks, "Limit did not survive reload");
+                });
+            }
+            finally { SettingsManager.Save(original); }
+        }
+
+        private static async Task RetrievalLimitsAsync()
+        {
+            var notes = new FakeNotes();
+            notes.Pages["p1"].Outlines[0].TextBlocks = Enumerable.Range(0, 128)
+                .Select(i => new OneNoteAI.OneNote.Models.TextBlock
+                {
+                    ElementId = "passage-" + i,
+                    Text = "Unique passage " + i + ": " + new string('x', 2200)
+                }).ToList();
+            Check(NoteChunker.Split(notes.Pages["p1"], notes.PageState("p1")).Count >= 100, "Retrieval limit fixture is too small");
+            var options = Settings().Knowledge;
+            options.Embedding.Dimensions = 8;
+            var fake = new FakeEmbeddings();
+            using (var store = new IndexStore(Folder()))
+            {
+                var retrieval = new RetrievalService(notes, store, new VectorIndex(store));
+                Equal(16, retrieval.CurrentPage("p1", "passage", CancellationToken.None).Chunks.Count);
+                foreach (int limit in new[] { 1, 8, 16, 48, 100 })
+                {
+                    options.MaxRetrievedChunks = limit;
+                    RetrievalResult page = retrieval.CurrentPage("p1", "passage", CancellationToken.None, limit);
+                    Equal(limit, page.Chunks.Count, "Current-page limit was ignored");
+                    Check(page.Warnings.Any(w => w.Contains(limit + " selected passages")), "Partial-page warning lost its count");
+                    RetrievalResult native = await retrieval.SearchAsync("passage", new[] { "s1" }, options, CancellationToken.None, fake.Client(options.Embedding));
+                    Equal(limit, native.Chunks.Count, "Native candidate or fusion limits still cap configurable retrieval");
+                    Check(native.Chunks.All(c => c.PageId == "p1"), "Larger retrieval limit escaped scope");
+                }
+                Equal(0, fake.Calls, "Unindexed retrieval unexpectedly requested embeddings");
+                var settings = Settings();
+                settings.Knowledge = options;
+                int expectedSources = 0;
+                await using (var manager = new McpManager(() => Array.Empty<McpServerOptions>()))
+                using (var chat = Chat(body =>
+                {
+                    Equal(expectedSources, body["messages"].Count(m => ((string)m["content"] ?? "").StartsWith("Untrusted reference data:", StringComparison.Ordinal)),
+                        "Answering did not use the configured retrieval limit");
+                    return FakeHttp.Sse(Delta(new JObject { ["content"] = "Document evidence [S1]." }), Delta(new JObject(), "stop"));
+                }))
+                {
+                    var conversation = new KnowledgeConversation(retrieval, manager);
+                    foreach (string pageId in new[] { "p1", null })
+                    foreach (int limit in new[] { 3, 1 })
+                    {
+                        expectedSources = options.MaxRetrievedChunks = limit;
+                        KnowledgeAnswer answer = await conversation.AnswerAsync("Find passages.", pageId, new[] { "s1" },
+                            Array.Empty<string>(), settings, null, null, null, NoApproval, CancellationToken.None, chat);
+                        Equal(limit, answer.Sources.Count);
+                    }
+                }
+                options.MaxRetrievedChunks = 100;
+                options.ContextWindow = 8192;
+                await using (var manager = new McpManager(() => Array.Empty<McpServerOptions>()))
+                using (var chat = Chat(_ => FakeHttp.Sse(
+                    Delta(new JObject { ["content"] = "Selected document evidence [S1]." }), Delta(new JObject(), "stop"))))
+                {
+                    var conversation = new KnowledgeConversation(retrieval, manager);
+                    KnowledgeAnswer answer = await conversation.AnswerAsync("Find passages.", "p1", new[] { "s1" },
+                        Array.Empty<string>(), settings, null, null, null, NoApproval, CancellationToken.None, chat);
+                    Check(answer.Sources.Count > 0 && answer.Sources.Count < 100, "Configured count bypassed the model context budget");
+                    Check(answer.Warnings.Any(w => w.Contains("context/output budget")), "Budget-reduced passage count was not reported");
+                }
+                var indexing = new IndexingService(notes, store);
+                await indexing.UpdateAsync(options, null, CancellationToken.None, fake.Client(options.Embedding));
+                notes.NoSearchHits = true;
+                foreach (int limit in new[] { 1, 16, 48, 100 })
+                {
+                    options.MaxRetrievedChunks = limit;
+                    RetrievalResult semantic = await retrieval.SearchAsync("passage", new[] { "s1" }, options, CancellationToken.None, fake.Client(options.Embedding));
+                    Equal(limit, semantic.Chunks.Count, "Semantic candidate or fusion limits still cap configurable retrieval");
+                }
+                int calls = fake.Calls;
+                options.MaxRetrievedChunks = 5;
+                await indexing.UpdateAsync(options, null, CancellationToken.None, fake.Client(options.Embedding));
+                Equal(calls, fake.Calls, "Changing retrieval count rebuilt embeddings");
+                int reads = notes.Reads.Count;
+                foreach (int invalid in new[] { 0, 101 })
+                {
+                    options.MaxRetrievedChunks = invalid;
+                    await ThrowsAsync<InvalidOperationException>(() => Sync(() => retrieval.CurrentPage("p1", "passage", CancellationToken.None, invalid)));
+                    await ThrowsAsync<InvalidOperationException>(() => retrieval.SearchAsync("passage", new[] { "s1" }, options, CancellationToken.None));
+                }
+                Equal(reads, notes.Reads.Count, "Invalid retrieval count read document data");
+                Check(!notes.Reads.Contains("p2"), "Retrieval read outside the selected scope");
+            }
+        }
+
         private static Task DistanceAsync() => Sync(() =>
         {
             var random = new Random(27);
@@ -824,6 +965,7 @@ namespace OneNoteAI.Tests
             var notes = new FakeNotes { ReportedVersion = NoteNode.NormalizeVersion("2022-05-16T02:34:50.000Z") };
             var settings = Settings();
             var captured = new List<JObject>();
+            var activity = new List<string>();
             using (var store = new IndexStore(Folder()))
             await using (var mcp = new McpManager(() => Array.Empty<McpServerOptions>()))
             using (var chat = Chat(body =>
@@ -836,16 +978,102 @@ namespace OneNoteAI.Tests
             {
                 var conversation = new KnowledgeConversation(new RetrievalService(notes, store, new VectorIndex(store)), mcp);
                 KnowledgeAnswer first = await conversation.AnswerAsync("First question", "p1", Array.Empty<string>(), Array.Empty<string>(), settings,
-                    null, null, null, NoApproval, CancellationToken.None, chat);
+                    null, activity.Add, null, NoApproval, CancellationToken.None, chat);
                 Check(first.Sources.All(s => s.Note.PageId == "p1"), "First source binding wrong");
+                Check(activity.Any(a => a.Contains("current page only")) && activity.Any(a => a.Contains("Scope accessible pages: 1")),
+                    "Current-page scope was not reported");
                 notes.Pages["p1"].Outlines[0].TextBlocks[0].Text = "Updated source version.";
                 notes.Pages["p1"].DateModified = notes.Pages["p1"].DateModified.AddMinutes(1);
                 await conversation.AnswerAsync("Follow-up", "p1", Array.Empty<string>(), Array.Empty<string>(), settings, null, null, null, NoApproval, CancellationToken.None, chat);
                 Check(!captured[1].ToString().Contains("rollback plan") && !captured[1].ToString().Contains("Current answer"), "Stale evidence/history reused");
                 await conversation.AnswerAsync("New scope", "p2", Array.Empty<string>(), Array.Empty<string>(), settings, null, null, null, NoApproval, CancellationToken.None, chat);
                 Check(!captured[2].ToString().Contains("First question") && !captured[2].ToString().Contains("Updated source version"), "Scope switch retained source context");
+                notes.Add("aps", "s1", "APS scheduling", "APS scheduling uses open-source solvers such as OR-Tools and SCIP.");
+                activity.Clear();
+                KnowledgeAnswer section = await conversation.AnswerAsync("APS solvers", null, new[] { "s1" }, Array.Empty<string>(), settings,
+                    null, activity.Add, null, NoApproval, CancellationToken.None, chat);
+                Check(section.Sources.Any(s => s.Note.PageId == "aps") && section.Sources.All(s => s.Note.SectionId == "s1"),
+                    "Section answer omitted the other matching page or escaped the selected scope");
+                Check(!captured[3].ToString().Contains("Unrelated private content"), "A prior out-of-scope page was retained");
+                Check(activity.Any(a => a.Contains("Searching across pages")) && activity.Any(a => a.Contains("Scope accessible pages: 2")) &&
+                    activity.Any(a => a.Contains("2 passage(s) / 2 page(s)")), "Cross-page scope or supplied evidence counts were not reported");
             }
         }
+
+        private static Task ScopeRoutingAsync() => UiThread.Send<Task>(async () =>
+        {
+            try
+            {
+                foreach (string language in new[] { "en", "zh-CN" })
+                {
+                    var settings = Settings();
+                    settings.Language = language;
+                    SetStatic(typeof(SettingsManager), "_current", settings);
+                    var notes = new FakeNotes();
+                    notes.Add("aps", "s1", "APS scheduling", "APS scheduling uses open-source solvers such as OR-Tools and SCIP.");
+                    int currentPageReads = 0;
+                    using (var store = new IndexStore(Folder()))
+                    using (var dialog = new KnowledgeDialog(notes, store, () => { currentPageReads++; return "p1"; }))
+                    {
+                        const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic;
+                        T Field<T>(string name) => (T)typeof(KnowledgeDialog).GetField(name, flags).GetValue(dialog);
+                        object Invoke(string name) => typeof(KnowledgeDialog).GetMethod(name, flags).Invoke(dialog, null);
+                        void Populate()
+                        {
+                            typeof(KnowledgeDialog).GetField("_hierarchy", flags).SetValue(dialog, notes.Hierarchy());
+                            Invoke("Populate");
+                        }
+                        var mode = Field<ComboBox>("_mode");
+                        Equal(1, mode.SelectedIndex, "Authorized scope still defaulted to the current page");
+                        Populate();
+                        Equal<string>(null, (string)Invoke("CurrentPage"), "Selected-scope mode resolved to the active page");
+                        Check(Field<Label>("_scopeSummary").Text.Contains(language == "en" ? "2 accessible page(s)" : "2 个可访问页面"),
+                            "Scope summary omitted authorized page coverage");
+                        Field<TextBox>("_question").Text = "APS solvers";
+                        await (Task)Invoke("FindAsync");
+                        var sources = Field<ListBox>("_sources").Items.Cast<EvidenceSource>().ToList();
+                        Check(sources.Any(s => s.Note.PageId == "aps") && sources.All(s => s.Note.SectionId == "s1"),
+                            "Find passages did not search other pages in the selected section");
+                        Equal(0, currentPageReads, "Selected-scope retrieval consulted the active page");
+                        Check(notes.SearchedScopes.Count > 0 && notes.SearchedScopes.All(s => s == "s1"), "Selected scope did not reach native search");
+
+                        mode.SelectedIndex = 0;
+                        Populate();
+                        Equal(0, mode.SelectedIndex, "Refreshing settings overrode an explicit current-page selection");
+                        notes.Reads.Clear();
+                        notes.SearchedScopes.Clear();
+                        await (Task)Invoke("FindAsync");
+                        Equal(1, currentPageReads);
+                        Check(notes.Reads.All(p => p == "p1") && notes.SearchedScopes.Count == 0, "Explicit current-page mode searched other pages");
+                        Check(Field<Label>("_scopeSummary").Text.Contains(language == "en" ? "Current page only" : "仅此页"),
+                            "Current-page restriction was not visible");
+                        mode.SelectedIndex = 2;
+                        Equal("", (string)Invoke("CurrentPage"));
+                        Check(!Field<Button>("_find").Enabled, "No-notes mode allowed passage search");
+
+                        mode.SelectedIndex = 1;
+                        settings.Knowledge.AllowedRootIds.Clear();
+                        Populate();
+                        Equal(1, mode.SelectedIndex, "Revocation silently fell back to current-page reading");
+                        Check(Field<Label>("_scopeSummary").Text.Contains(language == "en" ? "no accessible authorized section" : "尚未选择"),
+                            "Empty scope was not visible");
+                    }
+
+                    using (var store = new IndexStore(Folder()))
+                    using (var dialog = new KnowledgeDialog(notes, store, () => "p1"))
+                    {
+                        const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic;
+                        var mode = (ComboBox)typeof(KnowledgeDialog).GetField("_mode", flags).GetValue(dialog);
+                        Equal(0, mode.SelectedIndex, "A fresh installation defaulted to unapproved cross-page reading");
+                        settings.Knowledge.AllowedRootIds.Add("s1");
+                        typeof(KnowledgeDialog).GetField("_hierarchy", flags).SetValue(dialog, notes.Hierarchy());
+                        typeof(KnowledgeDialog).GetMethod("Populate", flags).Invoke(dialog, null);
+                        Equal(1, mode.SelectedIndex, "First-time authorization left the window in current-page mode");
+                    }
+                }
+            }
+            finally { SetStatic(typeof(SettingsManager), "_current", Settings()); }
+        });
 
         private static async Task ToolLoopAsync()
         {
@@ -861,24 +1089,217 @@ namespace OneNoteAI.Tests
                 requests++;
                 if (requests == 1)
                 {
+                    Equal(0, fake.Methods.Count, "MCP was contacted before document assessment");
+                    Equal(1, body["tools"].Count(), "Remote tools were exposed before document assessment");
+                    Check(body.ToString().Contains("rollback plan"), "Model did not assess document evidence first");
+                    return DiscoverResponse("Update the requested record", "The user explicitly requested a record update outside OneNote.");
+                }
+                if (requests == 2)
+                {
+                    Equal("mcp_discover_tools", (string)body["tools"].First()["function"]["name"]);
+                    Equal(0, fake.Calls, "Discovery executed a remote tool");
                     string name = (string)body["tools"].First(t => ((string)t["function"]["description"]).Contains("change_record"))["function"]["name"];
                     return FakeHttp.Sse(Delta(new JObject { ["tool_calls"] = new JArray(new JObject { ["index"] = 0, ["id"] = "call1",
                         ["function"] = new JObject { ["name"] = name, ["arguments"] = "{\"id\":\"requested-record\"}" } }) }), Delta(new JObject(), "tool_calls"));
+                }
+                if (requests == 4)
+                {
+                    Equal(1, body["tools"].Count(), "Follow-up retained remote tools without a fresh assessment");
+                    Equal("mcp_discover_tools", (string)body["tools"][0]["function"]["name"]);
+                    Check(body.ToString().Contains("rollback plan"), "Follow-up did not retrieve document evidence");
+                    return FakeHttp.Sse(Delta(new JObject { ["content"] = "The document requires a rollback plan [S1]." }), Delta(new JObject(), "stop"));
                 }
                 JToken message = body["messages"].Last();
                 Equal("tool", (string)message["role"]);
                 Equal("call1", (string)message["tool_call_id"]);
                 Check(((string)message["content"]).Contains("\"id\":\"M1\""), "External source was not bound");
-                return FakeHttp.Sse(Delta(new JObject { ["content"] = "Operation returned [M1]." }), Delta(new JObject(), "stop"));
+                Check(body.ToString().Contains("rollback plan"), "Tool loop discarded document evidence");
+                return FakeHttp.Sse(Delta(new JObject { ["content"] = "The document requires a rollback plan [S1]. Operation returned [M1]." }), Delta(new JObject(), "stop"));
             }))
             {
                 var conversation = new KnowledgeConversation(new RetrievalService(new FakeNotes(), store, new VectorIndex(store)), manager);
-                KnowledgeAnswer answer = await conversation.AnswerAsync("Update the requested record.", "", Array.Empty<string>(), new[] { server.Id }, settings,
+                KnowledgeAnswer answer = await conversation.AnswerAsync("Update the requested record.", "p1", Array.Empty<string>(), new[] { server.Id }, settings,
                     null, null, null, NoApproval, CancellationToken.None, chat);
-                Equal(2, requests);
+                Equal(3, requests);
                 Equal(1, fake.Calls);
-                Equal("M1", answer.Sources.Single().Id);
-                Equal("returned", answer.Sources.Single().Execution.Status);
+                Equal(2, answer.Sources.Count);
+                Equal("S1", answer.Sources.Single(s => s.Note != null).Id);
+                Equal("M1", answer.Sources.Single(s => s.Execution != null).Id);
+                Equal("returned", answer.Sources.Single(s => s.Execution != null).Execution.Status);
+                int discoveries = fake.Lists;
+                await conversation.AnswerAsync("What is required for deployment?", "p1", Array.Empty<string>(), new[] { server.Id }, settings,
+                    null, null, null, NoApproval, CancellationToken.None, chat);
+                Equal(4, requests);
+                Equal(discoveries, fake.Lists, "Document follow-up repeated MCP discovery");
+                Equal(1, fake.Calls, "Document follow-up called MCP");
+            }
+        }
+
+        private static HttpResponseMessage DiscoverResponse(string query, string reason) =>
+            DiscoveryResponse(new JObject { ["query"] = query, ["reason"] = reason });
+
+        private static HttpResponseMessage DiscoveryResponse(JObject arguments) => FakeHttp.Sse(
+            Delta(new JObject { ["tool_calls"] = new JArray(new JObject { ["index"] = 0, ["id"] = "discover1",
+                ["function"] = new JObject { ["name"] = "mcp_discover_tools", ["arguments"] = arguments.ToString(Formatting.None) } }) }),
+            Delta(new JObject(), "tool_calls"));
+
+        private static async Task DocumentFirstAsync()
+        {
+            foreach (string mode in new[] { "enabled", "unselected", "disabled-server", "unsupported-model", "selected-scope", "no-notes" })
+            {
+                var notes = new FakeNotes();
+                var settings = Settings();
+                var server = Server();
+                var fake = new FakeMcpHttp();
+                settings.Knowledge.Servers.Add(server);
+                server.Enabled = mode != "disabled-server";
+                settings.Knowledge.ModelSupportsTools = mode != "unsupported-model";
+                settings.PromptOverrides.QA = "Use short paragraphs.";
+                string[] selected = mode == "unselected" ? Array.Empty<string>() : new[] { server.Id };
+                bool available = mode == "enabled" || mode == "selected-scope" || mode == "no-notes";
+                int requests = 0;
+                using (var store = new IndexStore(Folder()))
+                await using (var manager = new McpManager(() => settings.Knowledge.Servers, _ => fake))
+                using (var chat = Chat(body =>
+                {
+                    requests++;
+                    Equal(0, fake.Methods.Count, "Document-first answer contacted MCP");
+                    string policy = (string)body["messages"][0]["content"];
+                    Check(policy.Contains("Use short paragraphs.") && policy.Contains("Mandatory grounding and tool policy"),
+                        "Custom answer style replaced the grounding policy");
+                    Check(policy.Contains("If the user asks for documents only, do not use MCP") &&
+                        policy.Contains("Synthesize an answer from it whenever sufficient"), "Document-first policy missing");
+                    Check(!body.ToString().Contains("Unrelated private content"), "Document evidence escaped the selected scope");
+                    if (mode == "no-notes")
+                        Check(policy.Contains("The user disabled note reading") && notes.Reads.Count == 0, "Disabled note reading was ignored");
+                    else Check(body.ToString().Contains("rollback plan"), "Selected document evidence was absent");
+                    if (available)
+                    {
+                        Equal(1, body["tools"].Count());
+                        Equal("mcp_discover_tools", (string)body["tools"][0]["function"]["name"]);
+                        Check(body["tools"][0]["function"]["parameters"]["required"].Values<string>().Contains("reason"),
+                            "MCP discovery schema did not require a reason");
+                    }
+                    else
+                    {
+                        Check(body["tools"] == null || body["tools"].Type == JTokenType.Null, "Unavailable MCP was exposed");
+                        Check(policy.Contains("MCP is unavailable for this turn"), "Model was not informed that MCP is unavailable");
+                    }
+                    return FakeHttp.Sse(Delta(new JObject { ["content"] = mode == "no-notes"
+                        ? "No document evidence was supplied." : "A rollback plan is required [S1]." }), Delta(new JObject(), "stop"));
+                }))
+                {
+                    var conversation = new KnowledgeConversation(new RetrievalService(notes, store, new VectorIndex(store)), manager);
+                    KnowledgeAnswer answer = await conversation.AnswerAsync("Using only documents, what is required for deployment?",
+                        mode == "selected-scope" ? null : mode == "no-notes" ? "" : "p1", new[] { "s1" }, selected, settings,
+                        null, null, null, NoApproval, CancellationToken.None, chat);
+                    Equal(1, requests, "Document answer required an extra routing model call");
+                    Equal(0, fake.Methods.Count, "Document answer performed a remote MCP operation");
+                    Equal(mode == "no-notes" ? 0 : 1, answer.Sources.Count);
+                    if (answer.Sources.Count > 0) Equal("p1", answer.Sources.Single().Note.PageId);
+                }
+            }
+        }
+
+        private static async Task DiscoveryReasonAsync()
+        {
+            var arguments = new[]
+            {
+                new JObject { ["query"] = "latest guidance" },
+                new JObject { ["query"] = "latest guidance", ["reason"] = " " },
+                new JObject { ["query"] = " ", ["reason"] = "Need current guidance." },
+                new JObject { ["query"] = "latest guidance", ["reason"] = 123 },
+                new JObject { ["query"] = "latest guidance", ["reason"] = "Need current guidance.", ["offset"] = -1 }
+            };
+            foreach (JObject args in arguments)
+            {
+                var settings = Settings();
+                var server = Server();
+                var fake = new FakeMcpHttp();
+                settings.Knowledge.Servers.Add(server);
+                using (var store = new IndexStore(Folder()))
+                await using (var manager = new McpManager(() => settings.Knowledge.Servers, _ => fake))
+                using (var chat = Chat(_ => DiscoveryResponse(args)))
+                {
+                    var conversation = new KnowledgeConversation(new RetrievalService(new FakeNotes(), store, new VectorIndex(store)), manager);
+                    await ThrowsAsync<InvalidOperationException>(() => conversation.AnswerAsync("Check current deployment guidance.", "p1",
+                        Array.Empty<string>(), new[] { server.Id }, settings, null, null, null, NoApproval, CancellationToken.None, chat));
+                    Equal(0, fake.Methods.Count, "Invalid discovery arguments contacted MCP");
+                }
+            }
+        }
+
+        private static async Task AssistantBudgetAsync()
+        {
+            try
+            {
+                foreach (string language in new[] { "en", "zh-CN" })
+                foreach (bool enabled in new[] { false, true })
+                {
+                    var settings = Settings();
+                    settings.Language = language;
+                    settings.MaxTokens = 4096;
+                    settings.Knowledge.ContextWindow = 8192;
+                    SetStatic(typeof(SettingsManager), "_current", settings);
+                    var server = Server();
+                    settings.Knowledge.Servers.Add(server);
+                    using (var store = new IndexStore(Folder()))
+                    await using (var manager = new McpManager(() => settings.Knowledge.Servers,
+                        _ => throw new Exception("Small-window document answer must not connect to MCP.")))
+                    using (var chat = Chat(body =>
+                    {
+                        Check(body.ToString().Contains("rollback plan"), "Prompt/tool overhead displaced all document evidence: " + language);
+                        return FakeHttp.Sse(Delta(new JObject { ["content"] = "A rollback plan is required [S1]." }), Delta(new JObject(), "stop"));
+                    }))
+                    {
+                        var conversation = new KnowledgeConversation(new RetrievalService(new FakeNotes(), store, new VectorIndex(store)), manager);
+                        KnowledgeAnswer answer = await conversation.AnswerAsync("What does deployment require?", "p1", Array.Empty<string>(),
+                            enabled ? new[] { server.Id } : Array.Empty<string>(), settings, null, null, null, NoApproval, CancellationToken.None, chat);
+                        Equal(1, answer.Sources.Count, "Small context lost its document source");
+                    }
+                }
+            }
+            finally { SetStatic(typeof(SettingsManager), "_current", Settings()); }
+        }
+
+        private static async Task DiscoveryFailureAsync()
+        {
+            var settings = Settings();
+            var server = Server();
+            settings.Knowledge.Servers.Add(server);
+            int attempts = 0, requests = 0;
+            var activity = new List<string>();
+            using (var store = new IndexStore(Folder()))
+            await using (var manager = new McpManager(() => settings.Knowledge.Servers, _ =>
+            {
+                attempts++;
+                throw new HttpRequestException("Synthetic connection failure.");
+            }))
+            using (var chat = Chat(body =>
+            {
+                requests++;
+                if (requests == 1)
+                {
+                    Equal(0, attempts);
+                    return DiscoverResponse("current deployment guidance", "The notes do not establish current external guidance.");
+                }
+                Equal(1, attempts);
+                Check(body.ToString().Contains("rollback plan"), "Discovery failure discarded document evidence");
+                JObject result = JObject.Parse((string)body["messages"].Last()["content"]);
+                Equal(0, result["tools"].Count());
+                Equal(1, result["warnings"].Count(), "Remote failure was presented as an empty successful directory");
+                return FakeHttp.Sse(Delta(new JObject { ["content"] = "The note requires a rollback plan [S1]. External verification is unavailable." }),
+                    Delta(new JObject(), "stop"));
+            }))
+            {
+                var conversation = new KnowledgeConversation(new RetrievalService(new FakeNotes(), store, new VectorIndex(store)), manager);
+                KnowledgeAnswer answer = await conversation.AnswerAsync("Check the documented deployment against current external guidance.", "p1",
+                    Array.Empty<string>(), new[] { server.Id }, settings, null, activity.Add, null, NoApproval, CancellationToken.None, chat);
+                Equal(2, requests);
+                Equal(1, attempts);
+                Equal(1, answer.Sources.Count);
+                Check(answer.Warnings.Any(w => w.Contains("MCP connection unavailable")), "MCP failure not surfaced");
+                Check(activity.Any(a => a.Contains("The notes do not establish current external guidance.")), "MCP reason not shown");
             }
         }
 
@@ -921,8 +1342,25 @@ namespace OneNoteAI.Tests
                 using (var store = new IndexStore(Folder()))
                 using (var main = new KnowledgeDialog(new FakeNotes(), store, () => "p1"))
                 {
-                    Preview(main, Path.Combine(images, "knowledge-assistant.png"));
+                    Equal("Q&A Assistant", Strings.BtnQA);
+                    Equal("OneNote Q&A Assistant", main.Text);
+                    Preview(main, Path.Combine(images, "qa-assistant.png"));
                 }
+                var localized = Settings();
+                localized.Language = "zh-CN";
+                SetStatic(typeof(SettingsManager), "_current", localized);
+                try
+                {
+                    using (var store = new IndexStore(Folder()))
+                    using (var main = new KnowledgeDialog(new FakeNotes(), store, () => "p1"))
+                    {
+                        Equal("问答助手", Strings.BtnQA);
+                        Equal("OneNote 问答助手", main.Text);
+                        Check(PromptTemplates.QASystemDefault.Contains("文档知识") && PromptTemplates.QASystemDefault.Contains("MCP"),
+                            "Chinese Q&A prompt omitted the new policy");
+                    }
+                }
+                finally { SetStatic(typeof(SettingsManager), "_current", Settings()); }
             });
         });
 

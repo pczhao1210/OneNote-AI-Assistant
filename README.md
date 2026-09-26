@@ -18,7 +18,7 @@ This plugin connects to DeepSeek, OpenAI, Ollama, or any OpenAI-compatible API, 
 | **Generate** | Create new content from natural language instructions, automatically referencing existing page content |
 | **Template** | Quick structured generation from 6 built-in templates: Meeting Notes, Book Notes, Weekly Report, Study Notes, Project Plan, Brainstorming |
 | **Rewrite** | Rewrite selected text or full page with custom instructions (e.g., "more formal", "more concise") |
-| **Knowledge** | Multi-turn, source-grounded answers and passage search. Independent **semantic + OneNote Search** retrieval, scoped by notebook, section group or section; optional Remote HTTPS MCP |
+| **Q&A Assistant** | Document-first, multi-turn answers and passage search. Independent **semantic + OneNote Search** retrieval within selected notebooks, section groups or sections; use enabled Remote HTTPS MCP only when external help is needed |
 | **Translate** | Translate selected text or full page to 8+ target languages (EN/ZH/JA/KO/FR/DE/ES/RU) |
 | **Tag** | AI auto-generates keyword tags (#format), category, and one-line topic summary |
 | **Extract Todos** | Smart two-step extraction: Step 1 reads OneNote native tags (✅/☐), Step 2 uses AI to discover hidden action items. Strictly distinguishes info lists from real todos. Auto-filters sensitive data |
@@ -69,7 +69,7 @@ and older versions retain the host's DPI mode with a warning in the add-in log.
 This applies only to the add-in's UI thread, without changing OneNote's DPI
 settings or modifying `OneNote.exe.config` / `dllhost.exe.config`.
 Ribbon icons use 128-pixel source artwork instead of enlarged 32-pixel images.
-The same scaling applies to the knowledge assistant, index settings, MCP
+The same scaling applies to the Q&A assistant, index settings, MCP
 connections, tool catalogs, approval prompts and source viewers.
 After installing an updated build, fully exit and restart OneNote.
 
@@ -78,7 +78,7 @@ After installing an updated build, fully exit and restart OneNote.
 1. **Build and package** using the developer commands below, or obtain a trusted installer.
 
 2. **Install**:
-   - Close OneNote and run `src\OneNoteAI.Installer\Output\OneNoteAISetup-2.1.2.exe`
+   - Close OneNote and run `src\OneNoteAI.Installer\Output\OneNoteAISetup-2.1.4.exe`
    - The installer includes managed dependencies and both SQLite native architectures, and registers both COM views on x64 Windows
 
 3. **Restart OneNote** — "AI Assistant" ribbon tab appears (10 buttons)
@@ -99,7 +99,7 @@ After installing an updated build, fully exit and restart OneNote.
 | **Generate** | Enter instruction → AI generates content → Insert to page |
 | **Template** | Choose template → Enter key info → AI expands to full document |
 | **Rewrite** | Select text → Enter requirements → Review result |
-| **Knowledge** | Choose note scope and optional MCP connections → Ask or find passages → Inspect sources → Follow up |
+| **Q&A Assistant** | Choose document scope → Ask for a document-first answer, optionally supplemented by MCP when needed → Inspect sources → Follow up |
 | **Translate** | Select text → Enter target language → View translation |
 | **Tag** | Click → Auto-analyze → Generate tags/category/topic |
 | **Todos** | Select scope → Shows native tags + AI-discovered action items |
@@ -111,19 +111,27 @@ After installing an updated build, fully exit and restart OneNote.
    - **Regenerate** — try again with same prompt
    - **Copy** — copy to clipboard
 
-## Knowledge retrieval
+## Q&A Assistant and document retrieval
 
-Open **Knowledge** in the ribbon. **Current page** works without an Embedding key or index; **Find passages** does not call the chat model. For cross-page retrieval:
+Open **Q&A Assistant** in the ribbon. **Ask** uses the chat model to synthesize document evidence, not just list search hits. **Current page** works without an Embedding key or index; **Find passages** is search-only and does not call the chat model. For cross-page retrieval:
 
 1. Open **Index / MCP settings**. Configure a separate HTTPS Embedding endpoint and API key. Presets are `text-embedding-3-small` (1536 dimensions, default) and `text-embedding-3-large` (3072). Dimensions `0` means the model default; a custom model needs its actual dimensions.
 2. Select the notebooks, section groups or sections you authorize for indexing, then save. Parent consent includes future descendants; identifiers, not display names, define scope. Click **Update index** to upload authorized text for Embeddings.
 3. Choose **Selected note scope** and a query scope within that consent. Ask a question or find passages. Semantic recall and native OneNote Search run independently, then merge; neither is restricted to the other's hits.
 
-No separately deployed vector database is needed. SQLite stores text, provenance, queue state and vectors; section/hash shards use HNSW with a bounded in-memory cache. Updates reuse unchanged vectors and resume persisted batches. Optional automatic refresh runs every five minutes **only while the knowledge window is open**. Changing the Embedding endpoint/model/dimensions requires reindexing and may incur new charges.
+When an authorized scope is configured, new Q&A windows default to **Selected note scope**; saving the first authorized scope also switches an open window to this mode. Without authorization, the default remains **Current page**. You can explicitly select Current page to restrict a query to that page. The scope banner and each turn identify the effective mode; the activity tab reports accessible pages, retrieved pages/passages and the evidence retained within the model budget. Scope size is not a claim that every page was read.
+
+**Index / MCP settings → Retrieved passage limit** accepts **1-100, default 16**, for current-page and cross-page answers as well as Find passages. Save to apply; no reindexing is needed. This is an upper limit, not a guaranteed count: deduplication, source checks and the model context budget may reduce the passages actually used. Higher limits may increase latency and token usage; they do not imply a complete review of the selected scope.
+
+No separately deployed vector database is needed. SQLite stores text, provenance, queue state and vectors; section/hash shards use HNSW with a bounded in-memory cache. Updates reuse unchanged vectors and resume persisted batches. Optional automatic refresh runs every five minutes **only while the Q&A window is open**. Changing the Embedding endpoint/model/dimensions requires reindexing and may incur new charges.
 
 OneNote hierarchy timestamps can differ from page-content timestamps. Reads compare each revision source separately and verify content stability. Index refresh checks accessible authorized pages locally, including pages whose hierarchy time did not change; only changed content needs new Embeddings. This local scan can take time for large scopes.
 
 Answers cite `[S1]` note sources separately from `[M1]` MCP results. Double-click a source to navigate to the note or inspect the tool receipt. Each follow-up retrieves fresh evidence; changing scope or service identity resets the conversation. **Save to current page** explicitly writes an answer and provenance to OneNote; changed or inaccessible sources must be refreshed first.
+
+**Documents first, MCP on demand.** Each turn starts with the selected document evidence. If it suffices, the model answers without connecting to MCP, listing remote tools or executing them. Only the local discovery gateway is initially exposed. For an out-of-document question, essential evidence gap, necessary verification/freshness check or explicitly requested external action, the model can request discovery with a focused query and brief reason. The reason appears in the activity view, then relevant tools become available. Every follow-up makes this decision again; earlier MCP use does not automatically enable remote tools for the next turn.
+
+Prompts distinguish document facts, external additions and inferences, explain conflicts and respect documents-only requests. Missing local evidence must not be disguised as a complete review using external sources. With MCP disabled or unavailable, the answer should state its limits rather than claim external verification. **Settings → Prompt templates → Q&A Assistant** customizes answer style; grounding, scope, citation and on-demand tool rules remain part of the runtime prompt.
 
 Coverage, failed pages and single-path degradation are reported. Without indexed pages, cross-page search can use OneNote Search alone. A small set of retrieved passages is **not an exhaustive notebook review**, and “no verified passages” does not mean an entire notebook has no answer. Long current pages also use selected passages; use the existing Summary command for page/section summarization.
 
@@ -137,7 +145,7 @@ OAuth uses the system browser, PKCE and a temporary `http://127.0.0.1:<port>/cal
 
 The directory exposes tools, resources and prompts. You can inspect schemas, run tools manually, read remote resources and retrieve prompts. Tools default to **Auto approve, including create/update/delete operations**. Set individual tools to **Require approval** or disable them; save settings to apply policy edits to conversations. New tools also default to Auto approve. Only enable trusted servers.
 
-MCP is off by default in each knowledge window. Enable the selected servers explicitly. Automatic calls require native tool calling in the chosen chat model; turn off that capability in settings for unsupported models and use the manual tool interface instead. Tool schemas, history and results share the context budget; set the actual context-window size for custom models.
+MCP is off by default in each Q&A window. Select servers and enable **MCP only when needed** to allow document-first, on-demand discovery and calls; it does not require MCP for every answer. Automatic calls require native tool calling in the chosen chat model; turn off that capability in settings for unsupported models and use the manual tool interface instead. Tool schemas, history and results share the context budget; set the actual context-window size for custom models. Manual directory browsing and tool execution remain explicit actions, outside automatic answer routing.
 
 The activity view distinguishes rejection, tool errors, returned results and **unknown outcome**. Cancellation is not rollback. A response lost after dispatch stops the tool loop and is not automatically replayed: inspect the remote system before retrying. External results remain session-local unless explicitly saved to OneNote. Image/audio/binary content is identified as omitted, not silently treated as text.
 
@@ -171,7 +179,7 @@ src\OneNoteAI.AddIn
 │   ├── GenerateCommand    # Content generation
 │   ├── TemplateCommand    # Template generation (6 presets)
 │   ├── RewriteCommand     # Rewrite
-│   ├── QACommand          # Knowledge-window entry point
+│   ├── QACommand          # Q&A Assistant entry point
 │   ├── TranslateCommand   # Translation
 │   ├── TagCommand         # Auto-tag/classify
 │   └── ExtractTodosCommand # Todo extraction (native tags + AI)

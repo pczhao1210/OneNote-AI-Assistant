@@ -209,7 +209,7 @@ namespace OneNoteAI.UI
                 Location = new Point(10, 8),
                 Size = new Size(510, 32),
                 ForeColor = Color.FromArgb(90, 100, 115),
-                Text = "可为每个功能自定义 system prompt。留空则使用内置默认值。修改后立即生效（无需重启）。"
+                Text = "留空使用默认 Prompt，保存后生效。问答自定义样式不替代文档优先、来源与按需 MCP 规则。"
             };
 
             TabControl promptTabs = new TabControl
@@ -221,7 +221,7 @@ namespace OneNoteAI.UI
             _txtPromptSummarize = BuildPromptEditor(promptTabs, "摘要", () => PromptTemplates.SummarizeSystemDefault);
             _txtPromptGenerate = BuildPromptEditor(promptTabs, "生成", () => PromptTemplates.GenerateSystemDefault);
             _txtPromptRewrite = BuildPromptEditor(promptTabs, "改写", () => PromptTemplates.RewriteSystemDefault);
-            _txtPromptQA = BuildPromptEditor(promptTabs, "问答", () => PromptTemplates.QASystemDefault);
+            _txtPromptQA = BuildPromptEditor(promptTabs, Strings.BtnQA, () => PromptTemplates.QASystemDefault);
             _txtPromptExtractTodos = BuildPromptEditor(promptTabs, "提取待办", () => PromptTemplates.ExtractTodosSystemDefault);
 
             tabPrompts.Controls.Add(lblPromptHint);

@@ -78,7 +78,7 @@ namespace OneNoteAI.AI
         {
             ChatChoice result = await StreamChoiceAsync(request, onToken, cancellationToken).ConfigureAwait(false);
             if (result.Message.ToolCalls?.Count > 0)
-                throw new InvalidOperationException("This action does not support tool calls. Use the knowledge assistant.");
+                throw new InvalidOperationException("This action does not support tool calls. Use the Q&A assistant.");
             onComplete?.Invoke(result.Message.Content);
         }
 

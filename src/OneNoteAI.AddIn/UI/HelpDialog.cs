@@ -141,7 +141,7 @@ namespace OneNoteAI.UI
             features.Nodes.Add(new TreeNode(zh ? "生成" : "Generate") { Tag = "generate" });
             features.Nodes.Add(new TreeNode(zh ? "模板" : "Template") { Tag = "template" });
             features.Nodes.Add(new TreeNode(zh ? "改写" : "Rewrite") { Tag = "rewrite" });
-            features.Nodes.Add(new TreeNode(zh ? "知识助手" : "Knowledge") { Tag = "qa" });
+            features.Nodes.Add(new TreeNode(Strings.BtnQA) { Tag = "qa" });
             features.Nodes.Add(new TreeNode(zh ? "翻译" : "Translate") { Tag = "translate" });
             features.Nodes.Add(new TreeNode(zh ? "标签" : "Tag") { Tag = "tag" });
             features.Nodes.Add(new TreeNode(zh ? "提取待办" : "Todos") { Tag = "todos" });
@@ -237,13 +237,13 @@ namespace OneNoteAI.UI
 ## 第二步：开始使用
 - 打开任意 OneNote 页面
 - 在 Ribbon 栏找到「AI 助手」标签页
-- 选择需要的功能（摘要、生成、知识助手等）
+- 选择需要的功能（摘要、生成、问答助手等）
 - 在弹出的对话框中查看 AI 结果
 - 点击「插入页面」将结果写入笔记
 
 ## 小提示
 - 普通结果窗口支持「重新生成」
-- 知识助手可直接输入追问，每次重新检索来源
+- 问答助手可直接输入追问，每次重新检索来源
 - 翻译和改写功能会自动识别选中的文本";
 
                 case "summarize": return
@@ -319,16 +319,27 @@ namespace OneNoteAI.UI
 - 「修正语法」→ 修复错别字和语法错误";
 
                 case "qa": return
-@"# 知识助手
+@"# 问答助手
 
-围绕笔记、知识获取和学习，结合语义检索与 OneNote Search 回答问题。
+优先基于所选范围内的文档知识，结合语义检索与 OneNote Search 综合回答，而非只展示搜索结果。
+
+## 回答原则
+- 先分析文档证据；足够回答时不连接或调用 MCP
+- 问题超出文档、缺少关键证据、需要时效核实或用户明确要求外部操作时，才按需使用已启用的 MCP
+- 外部补充前在活动区说明简短理由；文档依据、外部结果、推断及冲突分别说明
+- 用户要求仅依据文档时不调用 MCP；MCP 关闭或不可用时明确说明限制
+- 自定义问答 Prompt 用于调整表达，仍保留文档优先、来源与按需 MCP 规则
 
 ## 使用方法
 - 当前页面：无需 Embedding 或索引；长页面只选取相关片段
+- 已授权范围时默认使用「选定笔记范围」；首次授权后自动切换。仅想问当前页时需手动选择「当前页面」
+- 窗口范围栏和每轮记录标明实际模式；活动区显示范围、召回及送入模型的页面/片段数量，不代表逐页通读
 - 跨页：在「索引与 MCP 设置」授权笔记本、分区组或分区，并配置独立 Embedding Key
 - 预设 text-embedding-3-small（1536 维）和 text-embedding-3-large（3072 维）
 - 点击「更新索引」，再选择授权范围内的查询范围；两条检索路径独立召回
 - 「找资料」不调用聊天模型；输入追问会重新检索
+- 「索引与 MCP 设置」可调整检索片段上限（1-100，默认 16），对当前页和跨页均生效，无需重建索引
+- 上限不是保证数量；去重、来源校验及上下文预算可能减少实际片段，调大可能增加耗时和 Token 用量
 - 双击 [S1] 笔记来源定位原文；[M1] 表示外部工具结果
 - 「保存到当前页」显式写入回答与来源，旧来源需先刷新
 
@@ -343,7 +354,7 @@ namespace OneNoteAI.UI
 ## Remote HTTPS MCP
 - 支持 Streamable HTTP，认证可选 Bearer、API-key 请求头或浏览器 OAuth
 - 可浏览工具、资源、提示词，也可手动调用；自动调用要求聊天模型支持原生工具
-- 知识窗口默认不启用 MCP，需要显式选择连接
+- 问答窗口默认不启用 MCP，需要勾选「允许按需使用 MCP」并选择连接；每轮先分析文档，再决定是否发现工具
 - 工具默认 Auto approve，包括增删改；可按工具设为 Require approval 或禁用，保存设置生效
 - 停止不保证远程回滚；响应丢失会报告结果未知，不自动重放
 - 外部结果仅保留在会话，除非显式保存到笔记；只启用可信服务";
@@ -531,13 +542,13 @@ Welcome to OneNote AI Assistant!
 ## Step 2: Start Using
 - Open any OneNote page
 - Find the AI Assistant tab in the Ribbon
-- Choose a feature (Summary, Generate, Knowledge, etc.)
+- Choose a feature (Summary, Generate, Q&A Assistant, etc.)
 - Review the AI result in the dialog
 - Click Insert to add the result to your page
 
 ## Tips
 - Standard result dialogs support Regenerate
-- Type follow-ups in Knowledge; each turn retrieves fresh sources
+- Type follow-ups in Q&A Assistant; each turn retrieves fresh sources
 - Translate and Rewrite auto-detect selected text";
 
                 case "summarize": return
@@ -594,12 +605,21 @@ Rewrite or polish text using AI.
 - Review and insert the result";
 
                 case "qa": return
-@"# Knowledge
+@"# Q&A Assistant
 
-Source-grounded learning and knowledge retrieval with semantic search and OneNote Search.
+Answer from documents in the selected scope first, using semantic search and OneNote Search to synthesize answers rather than just display hits.
+
+## Answer policy
+- Assess document evidence first; do not connect to or call MCP when it is sufficient
+- Use enabled MCP only for out-of-document questions, essential evidence gaps, necessary freshness checks or explicitly requested external actions
+- Show a brief reason in the activity view before external discovery; distinguish documents, external results, inferences and conflicts
+- Respect documents-only requests; explain limitations when MCP is disabled or unavailable
+- Custom Q&A prompts control presentation; document-first grounding, citations and on-demand MCP rules remain in place
 
 ## Getting started
 - Current page needs no Embeddings or index; long pages use selected passages
+- With an authorized scope, default to Selected note scope; first-time authorization switches to it. Select Current page explicitly to restrict reading
+- The scope banner and each turn identify the mode; activity reports scope, retrieval and model-input counts, not an exhaustive page review
 - For cross-page retrieval, open Index / MCP settings and authorize notebooks, section groups or sections
 - Configure a separate Embedding key: text-embedding-3-small (1536) or text-embedding-3-large (3072)
 - Update the index, then select a query scope within consent; both retrieval paths run independently
@@ -614,11 +634,13 @@ Source-grounded learning and knowledge retrieval with semantic search and OneNot
 - Optional automatic refresh runs every five minutes while this window is open
 - Clear local index does not alter OneNote; unavailable sources are excluded from retrieval
 - Retrieved passages are not a complete notebook review; coverage and degraded paths are reported
+- Index / MCP settings accepts a retrieved passage limit of 1-100 (default 16), for current-page and cross-page retrieval without reindexing
+- This is a maximum, not a guaranteed count; deduplication, source checks and context budgets may reduce it. Higher limits may increase latency and token usage
 
 ## Remote HTTPS MCP
 - Streamable HTTP with Bearer, API-key headers or browser OAuth
 - Browse tools/resources/prompts or call tools manually; automatic calls require native model tool support
-- MCP is off by default in the knowledge window; enable selected connections explicitly
+- MCP is off by default in the Q&A window; select connections and enable MCP only when needed. Each turn assesses documents before discovering tools
 - Tools default to Auto approve, including writes/deletes; set Require approval or disable per tool and save settings
 - Stop is not rollback; a lost reply is an unknown outcome and is not automatically replayed
 - External results stay in this session unless saved to notes; enable only trusted servers";

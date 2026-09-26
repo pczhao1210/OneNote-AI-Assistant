@@ -14,5 +14,5 @@ using System.Runtime.CompilerServices;
 [assembly: ComVisible(false)]
 [assembly: InternalsVisibleTo("OneNoteAI.Tests")]
 [assembly: Guid("67A7A8F4-62B1-449C-91E2-58257C4BFDAA")]
-[assembly: AssemblyVersion("2.1.2.0")]
-[assembly: AssemblyFileVersion("2.1.2.0")]
+[assembly: AssemblyVersion("2.1.4.0")]
+[assembly: AssemblyFileVersion("2.1.4.0")]
