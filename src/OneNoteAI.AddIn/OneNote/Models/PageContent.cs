@@ -71,6 +71,9 @@ namespace OneNoteAI.OneNote.Models
 
         public int IndentLevel { get; set; }
 
+        public int TableColumn { get; set; }
+        public bool EndsTableRow { get; set; }
+
         /// <summary>Tag applied to this text block (null if none).</summary>
         public TagInfo Tag { get; set; }
     }

@@ -33,6 +33,23 @@ namespace OneNoteAI.Settings
 
         [JsonProperty("defaultModel")]
         public string DefaultModel { get; set; }
+
+        [JsonProperty("chatApi")]
+        public ChatApiOptions ChatApi { get; set; } = new ChatApiOptions();
+    }
+
+    [JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+    public enum TokenLimitParameter { Auto, MaxTokens, MaxCompletionTokens }
+
+    [JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+    public enum TemperatureParameter { Auto, Send, Omit }
+
+    public sealed class ChatApiOptions
+    {
+        [JsonProperty("tokenLimit")]
+        public TokenLimitParameter TokenLimit { get; set; }
+        [JsonProperty("temperature")]
+        public TemperatureParameter Temperature { get; set; }
     }
 
     public class AppSettings
@@ -64,6 +81,9 @@ namespace OneNoteAI.Settings
         [JsonProperty("promptOverrides")]
         public PromptOverrides PromptOverrides { get; set; } = new PromptOverrides();
 
+        [JsonProperty("knowledge")]
+        public KnowledgeOptions Knowledge { get; set; } = new KnowledgeOptions();
+
         // Each provider keeps its own encrypted key and last-used endpoint/model.
         // The three legacy fields above mirror the active entry for backward compatibility.
         [JsonProperty("providerSettings")]
@@ -80,8 +100,16 @@ namespace OneNoteAI.Settings
             {
                 return ApiBaseUrl;
             }
+            return GetDefaultBaseUrl(Provider);
+        }
 
-            switch (Provider)
+        public ChatApiOptions GetChatApiOptions() =>
+            ProviderSettings != null && ProviderSettings.TryGetValue(Provider, out ProviderSettings profile)
+                ? profile?.ChatApi ?? new ChatApiOptions() : new ChatApiOptions();
+
+        public static string GetDefaultBaseUrl(AiProvider provider)
+        {
+            switch (provider)
             {
                 case AiProvider.OpenAI:
                     return "https://api.openai.com/v1";
@@ -208,6 +236,7 @@ namespace OneNoteAI.Settings
 
         private static AppSettings _current;
         private static readonly object _lock = new object();
+        public static event EventHandler SettingsChanged;
 
         public static AppSettings Current
         {
@@ -246,21 +275,26 @@ namespace OneNoteAI.Settings
             }
         }
 
-        public static void Save()
+        public static AppSettings Snapshot()
+        {
+            lock (_lock)
+                return JsonConvert.DeserializeObject<AppSettings>(JsonConvert.SerializeObject(Current));
+        }
+
+        public static void Save(AppSettings settings = null)
         {
             lock (_lock)
             {
-                if (_current == null)
-                {
-                    _current = CreateDefaultSettings();
-                }
-
-                ApplyDefaults(_current);
+                AppSettings candidate = settings ?? Current;
+                ApplyDefaults(candidate);
                 Directory.CreateDirectory(SettingsDir);
-
-                string json = JsonConvert.SerializeObject(_current, Formatting.Indented);
-                File.WriteAllText(SettingsFile, json);
+                string temporary = SettingsFile + ".tmp";
+                File.WriteAllText(temporary, JsonConvert.SerializeObject(candidate, Formatting.Indented));
+                if (File.Exists(SettingsFile)) File.Replace(temporary, SettingsFile, null);
+                else File.Move(temporary, SettingsFile);
+                _current = candidate;
             }
+            SettingsChanged?.Invoke(null, EventArgs.Empty);
         }
 
         /// <summary>
@@ -295,9 +329,9 @@ namespace OneNoteAI.Settings
             Save();
         }
 
-        public static ProviderSettings GetActiveProviderSettings()
+        public static ProviderSettings GetActiveProviderSettings(AppSettings settings = null)
         {
-            AppSettings settings = Current;
+            settings = settings ?? Current;
             if (settings.ProviderSettings == null)
             {
                 settings.ProviderSettings = new System.Collections.Generic.Dictionary<AiProvider, ProviderSettings>();
@@ -316,10 +350,10 @@ namespace OneNoteAI.Settings
             return profile;
         }
 
-        public static void SwitchProvider(AiProvider provider)
+        public static void SwitchProvider(AiProvider provider, AppSettings settings = null)
         {
-            AppSettings settings = Current;
-            ProviderSettings oldProfile = GetActiveProviderSettings();
+            settings = settings ?? Current;
+            ProviderSettings oldProfile = GetActiveProviderSettings(settings);
             oldProfile.ApiKey = settings.ApiKey;
             oldProfile.ApiBaseUrl = settings.ApiBaseUrl;
             oldProfile.DefaultModel = settings.DefaultModel;
@@ -332,7 +366,7 @@ namespace OneNoteAI.Settings
                 settings.ProviderSettings[provider] = profile;
             }
             settings.ApiKey = profile.ApiKey;
-            settings.ApiBaseUrl = string.IsNullOrWhiteSpace(profile.ApiBaseUrl) ? settings.GetEffectiveBaseUrl() : profile.ApiBaseUrl;
+            settings.ApiBaseUrl = string.IsNullOrWhiteSpace(profile.ApiBaseUrl) ? AppSettings.GetDefaultBaseUrl(provider) : profile.ApiBaseUrl;
             settings.DefaultModel = string.IsNullOrWhiteSpace(profile.DefaultModel) ? settings.GetDefaultModelForProvider() : profile.DefaultModel;
         }
 
@@ -358,12 +392,12 @@ namespace OneNoteAI.Settings
 
             if (string.IsNullOrWhiteSpace(settings.ApiBaseUrl))
             {
-                settings.ApiBaseUrl = "https://api.deepseek.com";
+                settings.ApiBaseUrl = AppSettings.GetDefaultBaseUrl(settings.Provider);
             }
 
             if (string.IsNullOrWhiteSpace(settings.DefaultModel))
             {
-                settings.DefaultModel = "deepseek-chat";
+                settings.DefaultModel = settings.GetDefaultModelForProvider();
             }
 
             if (settings.Temperature < 0.0 || settings.Temperature > 2.0)
@@ -385,8 +419,9 @@ namespace OneNoteAI.Settings
             {
                 settings.PromptOverrides = new PromptOverrides();
             }
+            if (settings.Knowledge == null) settings.Knowledge = new KnowledgeOptions();
 
-            ProviderSettings profile = GetActiveProviderSettings();
+            ProviderSettings profile = GetActiveProviderSettings(settings);
             profile.ApiKey = settings.ApiKey;
             profile.ApiBaseUrl = settings.ApiBaseUrl;
             profile.DefaultModel = settings.DefaultModel;

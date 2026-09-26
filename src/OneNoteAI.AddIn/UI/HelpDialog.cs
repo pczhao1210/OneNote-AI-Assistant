@@ -141,7 +141,7 @@ namespace OneNoteAI.UI
             features.Nodes.Add(new TreeNode(zh ? "生成" : "Generate") { Tag = "generate" });
             features.Nodes.Add(new TreeNode(zh ? "模板" : "Template") { Tag = "template" });
             features.Nodes.Add(new TreeNode(zh ? "改写" : "Rewrite") { Tag = "rewrite" });
-            features.Nodes.Add(new TreeNode(zh ? "问答" : "Q&A") { Tag = "qa" });
+            features.Nodes.Add(new TreeNode(zh ? "知识助手" : "Knowledge") { Tag = "qa" });
             features.Nodes.Add(new TreeNode(zh ? "翻译" : "Translate") { Tag = "translate" });
             features.Nodes.Add(new TreeNode(zh ? "标签" : "Tag") { Tag = "tag" });
             features.Nodes.Add(new TreeNode(zh ? "提取待办" : "Todos") { Tag = "todos" });
@@ -223,13 +223,13 @@ namespace OneNoteAI.UI
 ## 第二步：开始使用
 - 打开任意 OneNote 页面
 - 在 Ribbon 栏找到「AI 助手」标签页
-- 选择需要的功能（摘要、生成、问答等）
+- 选择需要的功能（摘要、生成、知识助手等）
 - 在弹出的对话框中查看 AI 结果
 - 点击「插入页面」将结果写入笔记
 
 ## 小提示
-- 所有功能都支持「重新生成」，不满意可以重试
-- 问答功能支持多轮对话（「继续提问」按钮）
+- 普通结果窗口支持「重新生成」
+- 知识助手可直接输入追问，每次重新检索来源
 - 翻译和改写功能会自动识别选中的文本";
 
                 case "summarize": return
@@ -305,26 +305,34 @@ namespace OneNoteAI.UI
 - 「修正语法」→ 修复错别字和语法错误";
 
                 case "qa": return
-@"# 问答
+@"# 知识助手
 
-基于笔记内容进行智能问答，支持跨页搜索。
+围绕笔记、知识获取和学习，结合语义检索与 OneNote Search 回答问题。
 
 ## 使用方法
-- 点击「问答」按钮
-- 选择范围：「仅当前页面」或「整个分区」
-- 输入您的问题
-- AI 基于笔记内容回答，并标注信息来源
+- 当前页面：无需 Embedding 或索引；长页面只选取相关片段
+- 跨页：在「索引与 MCP 设置」授权笔记本、分区组或分区，并配置独立 Embedding Key
+- 预设 text-embedding-3-small（1536 维）和 text-embedding-3-large（3072 维）
+- 点击「更新索引」，再选择授权范围内的查询范围；两条检索路径独立召回
+- 「找资料」不调用聊天模型；输入追问会重新检索
+- 双击 [S1] 笔记来源定位原文；[M1] 表示外部工具结果
+- 「保存到当前页」显式写入回答与来源，旧来源需先刷新
 
-## 跨页问答（分区模式）
-- AI 会读取分区内所有页面
-- 回答会标注来源：[来源：页面名称]
-- 自动管理 token 预算，防止超限
-- 支持多轮追问（「继续提问」按钮）
+## 索引与隐私
+- 无需部署向量数据库；SQLite/HNSW 在本机保存明文笔记与向量缓存
+- 建索引会把授权文本发送给 Embedding 服务；父级授权包含未来子级
+- 更换模型、维度或端点需要重建，可能重新计费
+- 可选自动更新仅在窗口打开时每五分钟运行
+- 「清除本地索引」不修改 OneNote；暂时锁定的笔记停止参与检索
+- 检索片段不代表完整审阅；覆盖不足或单路失败会显示提示
 
-## 适用场景
-- 从大量笔记中快速找到特定信息
-- 对比分析不同页面的内容
-- 基于笔记内容进行推理和总结";
+## Remote HTTPS MCP
+- 支持 Streamable HTTP，认证可选 Bearer、API-key 请求头或浏览器 OAuth
+- 可浏览工具、资源、提示词，也可手动调用；自动调用要求聊天模型支持原生工具
+- 知识窗口默认不启用 MCP，需要显式选择连接
+- 工具默认 Auto approve，包括增删改；可按工具设为 Require approval 或禁用，保存设置生效
+- 停止不保证远程回滚；响应丢失会报告结果未知，不自动重放
+- 外部结果仅保留在会话，除非显式保存到笔记；只启用可信服务";
 
                 case "translate": return
 @"# 翻译
@@ -396,6 +404,10 @@ AI 自动分析页面内容，生成标签和分类。
 - 默认模型：deepseek-chat（通用）或 deepseek-reasoner（推理）
 - 温度：0.0-2.0，越高越有创意，越低越稳定
 - 最大 Token：单次生成的最大长度
+- 模型名可以直接输入，不限于下拉推荐项
+- 输出长度参数：默认自动；新模型可手动改用 max_completion_tokens
+- 温度参数：默认自动；不支持温度的模型选择「不发送」
+- 两项兼容设置按服务商保存，连接测试与实际功能共用
 
 ## Prompt 模板
 - 可自定义每个功能的 AI 系统提示词
@@ -420,7 +432,7 @@ AI 自动分析页面内容，生成标签和分类。
 ## Ollama（本地）
 - Base URL：http://localhost:11434/v1
 - 模型：qwen2.5:7b 等本地模型
-- 无需 API Key，数据完全本地处理
+- 聊天无需 API Key；云端 Embedding 和 MCP 独立配置，并非本地处理
 - 需先安装 Ollama 并下载模型
 
 ## 自定义
@@ -505,13 +517,13 @@ Welcome to OneNote AI Assistant!
 ## Step 2: Start Using
 - Open any OneNote page
 - Find the AI Assistant tab in the Ribbon
-- Choose a feature (Summary, Generate, Q&A, etc.)
+- Choose a feature (Summary, Generate, Knowledge, etc.)
 - Review the AI result in the dialog
 - Click Insert to add the result to your page
 
 ## Tips
-- All features support Regenerate if you want a different result
-- Q&A supports multi-turn conversation (Follow-up button)
+- Standard result dialogs support Regenerate
+- Type follow-ups in Knowledge; each turn retrieves fresh sources
 - Translate and Rewrite auto-detect selected text";
 
                 case "summarize": return
@@ -568,21 +580,34 @@ Rewrite or polish text using AI.
 - Review and insert the result";
 
                 case "qa": return
-@"# Q&A
+@"# Knowledge
 
-Intelligent Q&A based on your notes, with cross-page search.
+Source-grounded learning and knowledge retrieval with semantic search and OneNote Search.
 
-## How to Use
-- Click the Q&A button
-- Choose scope: Current Page or Entire Section
-- Enter your question
-- AI answers based on note content with source citations
+## Getting started
+- Current page needs no Embeddings or index; long pages use selected passages
+- For cross-page retrieval, open Index / MCP settings and authorize notebooks, section groups or sections
+- Configure a separate Embedding key: text-embedding-3-small (1536) or text-embedding-3-large (3072)
+- Update the index, then select a query scope within consent; both retrieval paths run independently
+- Find passages does not call the chat model; follow-ups retrieve fresh evidence
+- Double-click [S1] note sources to navigate; [M1] identifies an external tool result
+- Save to current page explicitly writes the answer and provenance; stale sources need refreshing
 
-## Cross-page Mode
-- AI reads all pages in the section
-- Answers include source: [Source: Page Name]
-- Automatic token budget management
-- Supports multi-turn follow-up questions";
+## Index and privacy
+- No database server is needed; SQLite/HNSW cache plaintext notes and vectors locally
+- Indexing sends authorized text to the Embedding service; parent consent includes future descendants
+- Changing endpoint/model/dimensions requires reindexing and may incur charges
+- Optional automatic refresh runs every five minutes while this window is open
+- Clear local index does not alter OneNote; unavailable sources are excluded from retrieval
+- Retrieved passages are not a complete notebook review; coverage and degraded paths are reported
+
+## Remote HTTPS MCP
+- Streamable HTTP with Bearer, API-key headers or browser OAuth
+- Browse tools/resources/prompts or call tools manually; automatic calls require native model tool support
+- MCP is off by default in the knowledge window; enable selected connections explicitly
+- Tools default to Auto approve, including writes/deletes; set Require approval or disable per tool and save settings
+- Stop is not rollback; a lost reply is an unknown outcome and is not automatically replayed
+- External results stay in this session unless saved to notes; enable only trusted servers";
 
                 case "translate": return
 @"# Translate
@@ -633,10 +658,14 @@ Smart todo extraction combining OneNote native tags and AI analysis.
 - Auto-select model: picks best model based on content length
 - Temperature: 0.0-2.0 (higher = more creative)
 - Max Tokens: maximum generation length
+- Type any model ID; suggestions are not a restriction
+- Output limit field: Auto, max_tokens or max_completion_tokens
+- Temperature field: Auto, Send or Omit for models that reject temperature
+- Compatibility settings are saved per provider and shared by tests and commands
 
 ## Language
 - Auto: follows system language
-- Chinese / English: manual override";
+- The saved language setting supports auto, zh-CN and en; this window preserves it";
 
                 case "providers": return
 @"# Multi-Provider Support
@@ -651,7 +680,7 @@ Smart todo extraction combining OneNote native tags and AI analysis.
 
 ## Ollama (Local)
 - URL: http://localhost:11434/v1
-- No API key needed, fully local processing
+- Chat needs no API key; cloud Embeddings and MCP remain separate remote services
 - Install Ollama first, then pull a model
 
 ## Custom

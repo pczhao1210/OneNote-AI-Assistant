@@ -16,7 +16,6 @@ packages/
 nuget.exe
 
 # Test files
-tests/
 TestAddIn.cs
 TestAddIn.dll
 

@@ -177,7 +177,7 @@ namespace OneNoteAI.Features
                 ProgressOverlay localProgress = ProgressOverlay.Show(null);
                 try
                 {
-                    using (DeepseekClient client = new DeepseekClient(apiKey, settings.ApiBaseUrl))
+                    using (DeepseekClient client = new DeepseekClient(settings))
                     {
                         localProgress.UpdateStatus(string.Format("AI 正在生成「{0}」...", selected.Name));
                         ChatRequest request = new ChatRequest

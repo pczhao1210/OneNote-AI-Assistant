@@ -111,7 +111,7 @@ namespace OneNoteAI.Features
                 ProgressOverlay localProgress = ProgressOverlay.Show(null);
                 try
                 {
-                    using (DeepseekClient client = new DeepseekClient(apiKey, settings.ApiBaseUrl))
+                    using (DeepseekClient client = new DeepseekClient(settings))
                     {
                         if (cachedUserPrompt == null)
                         {
@@ -195,7 +195,7 @@ namespace OneNoteAI.Features
                 resultDialog.Show(UiThread.Anchor);
 
                 string apiKey = SettingsManager.GetApiKey();
-                using (DeepseekClient client = new DeepseekClient(apiKey, settings.ApiBaseUrl))
+                using (DeepseekClient client = new DeepseekClient(settings))
                 {
                     // ── MAP: per-page summaries ──
                     List<string> partialSummaries = new List<string>();

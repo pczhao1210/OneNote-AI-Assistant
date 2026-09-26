@@ -94,7 +94,7 @@ namespace OneNoteAI.Features
                 ProgressOverlay localProgress = ProgressOverlay.Show(null);
                 try
                 {
-                    using (DeepseekClient client = new DeepseekClient(apiKey, settings.ApiBaseUrl))
+                    using (DeepseekClient client = new DeepseekClient(settings))
                     {
                         ChatRequest request = CreateRequest(settings, model, systemPrompt, userPrompt);
                         string finalText = string.Empty;

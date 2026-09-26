@@ -1,5 +1,6 @@
 using System.Reflection;
 using System.Runtime.InteropServices;
+using System.Runtime.CompilerServices;
 
 [assembly: AssemblyTitle("OneNote AI 助手")]
 [assembly: AssemblyDescription("OneNote �?Deepseek AI 智能助手插件")]
@@ -10,7 +11,8 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 
-[assembly: ComVisible(true)]
+[assembly: ComVisible(false)]
+[assembly: InternalsVisibleTo("OneNoteAI.Tests")]
 [assembly: Guid("67A7A8F4-62B1-449C-91E2-58257C4BFDAA")]
 [assembly: AssemblyVersion("2.1.2.0")]
 [assembly: AssemblyFileVersion("2.1.2.0")]

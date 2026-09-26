@@ -4,6 +4,8 @@ VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OneNoteAI.AddIn", "src\OneNoteAI.AddIn\OneNoteAI.AddIn.csproj", "{6AA57F6B-2F22-4E33-9760-0ADDA56D2D15}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OneNoteAI.Tests", "tests\OneNoteAI.Tests\OneNoteAI.Tests.csproj", "{BFFBDF4E-A8BD-47E9-92B8-3183925B070C}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|AnyCPU = Debug|AnyCPU
@@ -14,6 +16,10 @@ Global
 		{6AA57F6B-2F22-4E33-9760-0ADDA56D2D15}.Debug|AnyCPU.Build.0 = Debug|AnyCPU
 		{6AA57F6B-2F22-4E33-9760-0ADDA56D2D15}.Release|AnyCPU.ActiveCfg = Release|AnyCPU
 		{6AA57F6B-2F22-4E33-9760-0ADDA56D2D15}.Release|AnyCPU.Build.0 = Release|AnyCPU
+		{BFFBDF4E-A8BD-47E9-92B8-3183925B070C}.Debug|AnyCPU.ActiveCfg = Debug|AnyCPU
+		{BFFBDF4E-A8BD-47E9-92B8-3183925B070C}.Debug|AnyCPU.Build.0 = Debug|AnyCPU
+		{BFFBDF4E-A8BD-47E9-92B8-3183925B070C}.Release|AnyCPU.ActiveCfg = Release|AnyCPU
+		{BFFBDF4E-A8BD-47E9-92B8-3183925B070C}.Release|AnyCPU.Build.0 = Release|AnyCPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
