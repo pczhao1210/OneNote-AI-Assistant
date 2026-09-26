@@ -51,37 +51,39 @@ namespace OneNoteAI.UI
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
 
-            // Create an invisible message-loop anchor form. Application.Run
-            // pumps its messages and keeps the thread alive.
-            _pumpForm = new Form
+            _pumpForm = new MessageAnchor
             {
                 FormBorderStyle = FormBorderStyle.None,
                 ShowInTaskbar = false,
                 StartPosition = FormStartPosition.Manual,
                 Location = new System.Drawing.Point(-32000, -32000),
                 Size = new System.Drawing.Size(1, 1),
-                Opacity = 0,
                 Visible = false
-            };
-
-            _pumpForm.Load += delegate
-            {
-                _pumpForm.Visible = false;
-                _syncContext = SynchronizationContext.Current
-                    ?? new WindowsFormsSynchronizationContext();
-                _ready.Set();
             };
 
             // Create the anchor handle before publishing the synchronization context.
             var handle = _pumpForm.Handle;
             GC.KeepAlive(handle);
-            if (_syncContext == null)
-            {
-                _syncContext = new WindowsFormsSynchronizationContext();
-                _ready.Set();
-            }
+            _syncContext = new WindowsFormsSynchronizationContext();
+            SynchronizationContext.SetSynchronizationContext(_syncContext);
+            _pumpForm.BeginInvoke(new Action(() => _ready.Set()));
+            // Passing a Form to Run makes it visible, even if Visible was false.
+            Application.Run();
+        }
 
-            Application.Run(_pumpForm);
+        private sealed class MessageAnchor : Form
+        {
+            protected override bool ShowWithoutActivation => true;
+            protected override void SetVisibleCore(bool value) => base.SetVisibleCore(false);
+            protected override CreateParams CreateParams
+            {
+                get
+                {
+                    CreateParams parameters = base.CreateParams;
+                    parameters.ExStyle = (parameters.ExStyle | 0x80) & ~0x40000; // TOOLWINDOW, not APPWINDOW
+                    return parameters;
+                }
+            }
         }
 
         /// <summary>Run an action on the UI thread (fire-and-forget).</summary>

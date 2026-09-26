@@ -244,9 +244,24 @@ namespace OneNoteAI.UI
                 _control.Select(_selectionStart, _selectionLength);
                 var position = new Point((int)Math.Round(_scrollPosition.X * factor),
                     (int)Math.Round(_scrollPosition.Y * factor));
+                // Reflow can shorten a rich-text document when the window grows.
+                position.X = ClampScroll(position.X, 0);
+                position.Y = ClampScroll(position.Y, 1);
                 SendMessage(_control.Handle, 0x04DE /* EM_SETSCROLLPOS */, IntPtr.Zero, ref position);
             }
+
+            private int ClampScroll(int position, int bar)
+            {
+                var info = new ScrollInfo { Size = Marshal.SizeOf<ScrollInfo>(), Mask = 3 };
+                return GetScrollInfo(_control.Handle, bar, ref info)
+                    ? Math.Max(0, Math.Min(position, info.Maximum - info.Page + 1)) : position;
+            }
         }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct ScrollInfo { public int Size, Mask, Minimum, Maximum, Page, Position, Track; }
+        [DllImport("user32.dll")]
+        private static extern bool GetScrollInfo(IntPtr window, int bar, ref ScrollInfo info);
 
         [DllImport("user32.dll")]
         private static extern IntPtr SendMessage(IntPtr window, int message, IntPtr wParam, ref Point lParam);

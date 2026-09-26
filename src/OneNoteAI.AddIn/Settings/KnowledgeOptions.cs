@@ -18,6 +18,7 @@ namespace OneNoteAI.Settings
         public int MaxRetrievedChunks { get; set; } = DefaultMaxRetrievedChunks;
         public bool ModelSupportsTools { get; set; } = true;
         public bool AutomaticIndexing { get; set; }
+        public bool EnableDiagramPreview { get; set; }
 
         public KnowledgeOptions Clone() => JsonConvert.DeserializeObject<KnowledgeOptions>(JsonConvert.SerializeObject(this));
 

@@ -1,0 +1,2 @@
+# Preserve the pinned vendor bundle byte-for-byte, including on Windows checkouts.
+src/OneNoteAI.AddIn/UI/Assets/mermaid.min.js -text -diff linguist-vendored=true

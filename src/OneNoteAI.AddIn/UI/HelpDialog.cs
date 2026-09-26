@@ -337,11 +337,16 @@ namespace OneNoteAI.UI
 - 跨页：在「索引与 MCP 设置」授权笔记本、分区组或分区，并配置独立 Embedding Key
 - 预设 text-embedding-3-small（1536 维）和 text-embedding-3-large（3072 维）
 - 点击「更新索引」，再选择授权范围内的查询范围；两条检索路径独立召回
-- 「找资料」不调用聊天模型；输入追问会重新检索
+- Enter 发送，Shift+Enter 换行，Ctrl+Enter 排队；中文输入法确认不会发送
+- 支持富文本表格、标题、嵌套列表和代码块；圆形白色图标用于发送/取消
+- 索引与 MCP 设置 → 回答显示可开启 Mermaid 预览（默认关闭，需检测 WebView2）；点击代码块下的“查看流程图”在独立窗口本地渲染
+- 回答成功后依次处理队列；取消或失败时暂停，可继续或移除。生成期间按 Enter 保留草稿
+- 输入框右侧图标用于发送/取消；索引设置、更新和搜索片段移到右上角「...」菜单，搜索片段不调用模型
 - 「索引与 MCP 设置」可调整检索片段上限（1-100，默认 16），对当前页和跨页均生效，无需重建索引
 - 上限不是保证数量；去重、来源校验及上下文预算可能减少实际片段，调大可能增加耗时和 Token 用量
-- 双击 [S1] 笔记来源定位原文；[M1] 表示外部工具结果
-- 「保存到当前页」显式写入回答与来源，旧来源需先刷新
+- 点击「来源」选择对话轮次，双击 [S1] 定位原文；[M1] 表示外部工具结果。「活动」按需展开
+- 「复制回答」复制选中文字或最新回答与来源，可自行粘贴；不会写入 OneNote，也不重新校验历史来源
+- 切换范围/设置或新建对话会清空队列；取消不保证撤销远程操作
 
 ## 索引与隐私
 - 无需部署向量数据库；SQLite/HNSW 在本机保存明文笔记与向量缓存
@@ -623,9 +628,14 @@ Answer from documents in the selected scope first, using semantic search and One
 - For cross-page retrieval, open Index / MCP settings and authorize notebooks, section groups or sections
 - Configure a separate Embedding key: text-embedding-3-small (1536) or text-embedding-3-large (3072)
 - Update the index, then select a query scope within consent; both retrieval paths run independently
-- Find passages does not call the chat model; follow-ups retrieve fresh evidence
-- Double-click [S1] note sources to navigate; [M1] identifies an external tool result
-- Save to current page explicitly writes the answer and provenance; stale sources need refreshing
+- Enter sends, Shift+Enter adds a newline, Ctrl+Enter queues; IME confirmation does not send
+- Tables, headings, nested lists and code blocks use native rich text; a circular white icon sends/cancels
+- Index / MCP settings → Answer display enables optional Mermaid previews after checking WebView2. Click View diagram below a code block for a separate local preview
+- Queued messages run serially after success. Cancellation/failure pauses the queue for explicit resume/removal; busy Enter keeps the draft
+- Use the composer icon to send/cancel. Index settings, updates and search-only Find passages are in the ... menu
+- Open Sources and select a turn; double-click [S1] to navigate, [M1] identifies a tool result. Activity expands on demand
+- Copy answer copies selected text or the latest answer and sources for pasting; it does not write to OneNote or revalidate historical sources
+- Scope/settings changes or a new chat clear the queue; cancellation cannot roll back remote actions
 
 ## Index and privacy
 - No database server is needed; SQLite/HNSW cache plaintext notes and vectors locally

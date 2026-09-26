@@ -33,6 +33,11 @@ namespace OneNoteAI.Tests
         [STAThread]
         private static int Main(string[] args)
         {
+            if (args.Contains("--legacy-rich-edit"))
+            {
+                AppContext.SetSwitch("Switch.System.Windows.Forms.DoNotLoadLatestRichEditControl", true);
+                args = args.Where(arg => arg != "--legacy-rich-edit").ToArray();
+            }
             AppDomain.CurrentDomain.AssemblyResolve += (sender, e) =>
             {
                 string path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, new AssemblyName(e.Name).Name + ".dll");
@@ -81,6 +86,10 @@ namespace OneNoteAI.Tests
                 ("OAuth discovery, PKCE, refresh and state validation", OAuthProtocolAsync),
                 ("fresh multi-turn evidence and scope reset", ConversationAsync),
                 ("selected-scope defaults and cross-page UI routing", ScopeRoutingAsync),
+                ("chat composer queue, copy, IME and hidden window lifecycle", () => ChatUiTests.Run(_root)),
+                ("Markdown tables, code and circular send controls", MarkdownTests.Run),
+                ("COM-host rich-text wrapping and Chinese diagram links", MarkdownTests.HostRendering),
+                ("offline Mermaid previews and runtime detection", () => MarkdownTests.Diagrams(_root)),
                 ("document-first answers avoid remote MCP discovery", DocumentFirstAsync),
                 ("document-first prompts fit small context windows", AssistantBudgetAsync),
                 ("MCP discovery requires an explicit reason", DiscoveryReasonAsync),
@@ -1049,7 +1058,7 @@ namespace OneNoteAI.Tests
                             "Current-page restriction was not visible");
                         mode.SelectedIndex = 2;
                         Equal("", (string)Invoke("CurrentPage"));
-                        Check(!Field<Button>("_find").Enabled, "No-notes mode allowed passage search");
+                        Check(!Field<ToolStripMenuItem>("_find").Enabled, "No-notes mode allowed passage search");
 
                         mode.SelectedIndex = 1;
                         settings.Knowledge.AllowedRootIds.Clear();
@@ -1358,6 +1367,8 @@ namespace OneNoteAI.Tests
                         Equal("OneNote 问答助手", main.Text);
                         Check(PromptTemplates.QASystemDefault.Contains("文档知识") && PromptTemplates.QASystemDefault.Contains("MCP"),
                             "Chinese Q&A prompt omitted the new policy");
+                        ChatUiTests.SeedPreview(main);
+                        Preview(main, Path.Combine(images, "qa-conversation-zh.png"));
                     }
                 }
                 finally { SetStatic(typeof(SettingsManager), "_current", Settings()); }
@@ -1366,7 +1377,8 @@ namespace OneNoteAI.Tests
 
         private static void Preview(Form form, string path)
         {
-            using (var host = new PreviewHost { Size = form.Size, Text = form.Text })
+            Size logicalSize = form.Size;
+            using (var host = new PreviewHost { Size = form.Size, Text = form.Text, Icon = form.Icon })
             {
                 form.TopLevel = false;
                 form.FormBorderStyle = FormBorderStyle.None;
@@ -1374,8 +1386,19 @@ namespace OneNoteAI.Tests
                 host.Controls.Add(form);
                 host.Show();
                 form.Show();
+                int dpi = DpiSupport.GetWindowDpi(form);
+                Size available = Screen.FromControl(host).WorkingArea.Size;
+                host.ClientSize = new Size(Math.Min((int)Math.Round(logicalSize.Width * dpi / 96.0), available.Width - 40),
+                    Math.Min((int)Math.Round(logicalSize.Height * dpi / 96.0), available.Height - 80));
                 var clock = Stopwatch.StartNew();
                 while (clock.ElapsedMilliseconds < 300) { Application.DoEvents(); Thread.Sleep(5); }
+                if (form is KnowledgeDialog)
+                {
+                    var transcript = (RichTextBox)typeof(KnowledgeDialog).GetField("_answer", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(form);
+                    transcript.Select(0, 0);
+                    transcript.ScrollToCaret();
+                    transcript.Refresh();
+                }
                 Check(form.Controls.Cast<Control>().Any(c => c.Visible && c.Width > 0 && c.Height > 0), "Preview did not create visible controls");
                 using (var bitmap = new Bitmap(host.Width, host.Height))
                 { host.DrawToBitmap(bitmap, new Rectangle(Point.Empty, bitmap.Size)); bitmap.Save(path); }

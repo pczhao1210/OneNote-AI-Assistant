@@ -15,8 +15,14 @@ internal static class IconGenerator
 
     public static int Main(string[] args)
     {
-        if (args.Length != 1) return 2;
+        if (args.Length < 1 || args.Length > 2) return 2;
         Directory.CreateDirectory(args[0]);
+        if (args.Length == 2 && args[1] == "QA")
+        {
+            Save(args[0], "QA", DrawQA);
+            SaveWindowIcon(args[0]);
+            return 0;
+        }
         Save(args[0], "Summarize", DrawSummarize);
         Save(args[0], "Generate", DrawGenerate);
         Save(args[0], "Template", DrawTemplate);
@@ -27,6 +33,7 @@ internal static class IconGenerator
         Save(args[0], "ExtractTodos", DrawTodos);
         Save(args[0], "Settings", DrawSettings);
         Save(args[0], "Help", DrawHelp);
+        SaveWindowIcon(args[0]);
         return 0;
     }
 
@@ -90,11 +97,81 @@ internal static class IconGenerator
 
     private static void DrawQA(Graphics g)
     {
-        using (var b = Brush(Soft)) g.FillPath(b, RoundedRect(4, 6, 19, 14, 5));
-        using (var p = Pen(Purple, 1.8f)) { g.DrawPath(p, RoundedRect(4, 6, 19, 14, 5)); g.DrawLine(p, 9, 19, 7, 24); g.DrawLine(p, 7, 24, 13, 20); }
-        using (var b = Brush(Teal)) g.FillPath(b, RoundedRect(15, 17, 13, 9, 4));
-        using (var font = new Font("Segoe UI", 11, FontStyle.Bold, GraphicsUnit.Pixel))
-        using (var b = Brush(Purple)) g.DrawString("?", font, b, 10, 7);
+        using (var shape = RoundedRect(3, 2, 21, 27, 4))
+        using (var fill = Brush(Purple)) g.FillPath(fill, shape);
+        using (var line = Pen(Color.FromArgb(215, 190, 236), 1.7f))
+        {
+            g.DrawLine(line, 8, 6, 8, 25);
+            g.DrawLine(line, 12, 8, 20, 8);
+            g.DrawLine(line, 12, 12, 18, 12);
+        }
+        using (var shape = RoundedRect(12, 15, 18, 12, 4))
+        using (var fill = Brush(Color.White)) g.FillPath(fill, shape);
+        using (var fill = Brush(Color.White)) g.FillPolygon(fill, new[] { new PointF(24, 25), new PointF(28, 30), new PointF(28, 24) });
+        using (var fill = Brush(Teal))
+        {
+            g.FillEllipse(fill, 16, 20, 2, 2);
+            g.FillEllipse(fill, 20, 20, 2, 2);
+            g.FillEllipse(fill, 24, 20, 2, 2);
+        }
+    }
+
+    private static void SaveWindowIcon(string directory)
+    {
+        int[] sizes = { 16, 24, 32, 48, 64, 128 };
+        var images = new byte[sizes.Length][];
+        for (int i = 0; i < sizes.Length; i++)
+            using (var bitmap = new Bitmap(sizes[i], sizes[i], PixelFormat.Format32bppArgb))
+            using (var graphics = Graphics.FromImage(bitmap))
+            using (var stream = new MemoryStream())
+            {
+                graphics.SmoothingMode = SmoothingMode.AntiAlias;
+                graphics.ScaleTransform(sizes[i] / 32F, sizes[i] / 32F);
+                DrawQA(graphics);
+                WriteIconBitmap(bitmap, stream);
+                images[i] = stream.ToArray();
+            }
+        using (var writer = new BinaryWriter(File.Create(Path.Combine(directory, "QA.ico"))))
+        {
+            writer.Write((ushort)0);
+            writer.Write((ushort)1);
+            writer.Write((ushort)sizes.Length);
+            int offset = 6 + sizes.Length * 16;
+            for (int i = 0; i < sizes.Length; i++)
+            {
+                writer.Write((byte)sizes[i]); writer.Write((byte)sizes[i]);
+                writer.Write((byte)0); writer.Write((byte)0);
+                writer.Write((ushort)1); writer.Write((ushort)32);
+                writer.Write(images[i].Length); writer.Write(offset);
+                offset += images[i].Length;
+            }
+            foreach (byte[] image in images) writer.Write(image);
+        }
+    }
+
+    private static void WriteIconBitmap(Bitmap bitmap, Stream stream)
+    {
+        // Framework Icon.ToBitmap expects a DIB for these sizes, not a PNG frame.
+        using (var writer = new BinaryWriter(stream, System.Text.Encoding.UTF8, true))
+        {
+            int width = bitmap.Width, height = bitmap.Height;
+            int maskStride = (width + 31) / 32 * 4;
+            var mask = new byte[maskStride * height];
+            writer.Write(40);
+            writer.Write(width); writer.Write(height * 2);
+            writer.Write((ushort)1); writer.Write((ushort)32);
+            writer.Write(0); writer.Write(width * height * 4);
+            writer.Write(new byte[16]);
+            for (int row = 0; row < height; row++)
+                for (int x = 0; x < width; x++)
+                {
+                    Color pixel = bitmap.GetPixel(x, height - row - 1);
+                    writer.Write(pixel.B); writer.Write(pixel.G);
+                    writer.Write(pixel.R); writer.Write(pixel.A);
+                    if (pixel.A == 0) mask[row * maskStride + x / 8] |= (byte)(0x80 >> (x % 8));
+                }
+            writer.Write(mask);
+        }
     }
 
     private static void DrawTranslate(Graphics g)

@@ -24,11 +24,12 @@ namespace OneNoteAI.UI
         private readonly NumericUpDown _retrievedChunks = new NumericUpDown { Minimum = 1, Maximum = KnowledgeOptions.MaxRetrievedChunksLimit };
         private readonly CheckBox _tools = new CheckBox { AutoSize = true };
         private readonly CheckBox _automatic = new CheckBox { AutoSize = true };
+        private readonly CheckBox _diagrams = new CheckBox { AutoSize = true };
         private readonly KnowledgeScopeTree _scope = new KnowledgeScopeTree();
         private readonly ListBox _servers = new ListBox { Dock = DockStyle.Fill };
         private CancellationTokenSource _test;
 
-        public KnowledgeSettingsDialog(NoteNode hierarchy)
+        public KnowledgeSettingsDialog(NoteNode hierarchy, Func<string> runtimeVersion = null)
         {
             _draft = (SettingsManager.Current.Knowledge ?? new KnowledgeOptions()).Clone();
             Text = L("知识索引与 MCP 设置", "Knowledge index and MCP settings");
@@ -100,6 +101,29 @@ namespace OneNoteAI.UI
             mcp.Controls.Add(mcpNotice);
             tabs.TabPages.Add(embedding);
             tabs.TabPages.Add(mcp);
+            var display = new TabPage(L("回答显示", "Answer display"));
+            var displayFields = Fields();
+            _diagrams.Text = L("启用 Mermaid 流程图预览（需要 WebView2）", "Enable Mermaid diagram previews (requires WebView2)");
+            Field(displayFields, L("流程图", "Diagrams"), _diagrams);
+            var runtime = new Label { AutoSize = true, MaximumSize = new Size(480, 0) };
+            Field(displayFields, "WebView2 Runtime", runtime);
+            var download = new LinkLabel { AutoSize = true, Text = L("Microsoft WebView2 下载页面", "Microsoft WebView2 download page") };
+            download.LinkClicked += (s, e) => System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(
+                "https://developer.microsoft.com/microsoft-edge/webview2/") { UseShellExecute = true });
+            Field(displayFields, "", download);
+            bool CheckRuntime()
+            {
+                try { runtime.Text = runtimeVersion == null ? DiagramPreviewDialog.RuntimeVersion() : runtimeVersion(); runtime.ForeColor = Theme.TextSecondary; return true; }
+                catch (InvalidOperationException ex) { runtime.Text = ex.Message; runtime.ForeColor = Theme.AccentRed; return false; }
+            }
+            _diagrams.CheckedChanged += (s, e) => { if (_diagrams.Checked && !CheckRuntime()) _diagrams.Checked = false; };
+            _diagrams.Checked = _draft.EnableDiagramPreview;
+            if (!_diagrams.Checked && string.IsNullOrEmpty(runtime.Text)) runtime.Text = L("启用时检测；默认关闭", "Checked when enabled; off by default");
+            display.Controls.Add(new Label { Dock = DockStyle.Fill, Padding = new Padding(16),
+                Text = L("正文使用原生富文本显示表格、标题、列表和代码块，无需浏览器。\n\n开启后，完整的 Mermaid 代码块下会显示“查看流程图”，点击在独立窗口中本地渲染。资源随安装包提供，不向外部渲染服务发送内容。语法错误时保留源码并提示；不会自动下载或安装 WebView2。",
+                    "Tables, headings, lists and code use native rich text, with no browser required.\n\nWhen enabled, complete Mermaid blocks offer View diagram in a separate local preview. Assets ship with the add-in; content is not sent to an external renderer. Invalid syntax keeps the source and shows an error. WebView2 is never downloaded or installed automatically.") });
+            display.Controls.Add(displayFields);
+            tabs.TabPages.Add(display);
             var footer = new FlowLayoutPanel { Dock = DockStyle.Bottom, Height = 56, FlowDirection = FlowDirection.RightToLeft, Padding = new Padding(8) };
             Button save = Theme.CreatePrimaryButton(L("保存设置", "Save settings"));
             Button cancel = Theme.CreateSecondaryButton(L("取消", "Cancel"));
@@ -115,6 +139,8 @@ namespace OneNoteAI.UI
                     _draft.MaxRetrievedChunks = (int)_retrievedChunks.Value;
                     _draft.ModelSupportsTools = _tools.Checked;
                     _draft.AutomaticIndexing = _automatic.Checked;
+                    if (_diagrams.Checked && !CheckRuntime()) return;
+                    _draft.EnableDiagramPreview = _diagrams.Checked;
                     _draft.Validate();
                     AppSettings latest = SettingsManager.Snapshot();
                     latest.Knowledge = _draft;

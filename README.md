@@ -78,7 +78,7 @@ After installing an updated build, fully exit and restart OneNote.
 1. **Build and package** using the developer commands below, or obtain a trusted installer.
 
 2. **Install**:
-   - Close OneNote and run `src\OneNoteAI.Installer\Output\OneNoteAISetup-2.1.4.exe`
+   - Close OneNote and run `src\OneNoteAI.Installer\Output\OneNoteAISetup-2.1.8.exe`
    - The installer includes managed dependencies and both SQLite native architectures, and registers both COM views on x64 Windows
 
 3. **Restart OneNote** — "AI Assistant" ribbon tab appears (10 buttons)
@@ -113,7 +113,7 @@ After installing an updated build, fully exit and restart OneNote.
 
 ## Q&A Assistant and document retrieval
 
-Open **Q&A Assistant** in the ribbon. **Ask** uses the chat model to synthesize document evidence, not just list search hits. **Current page** works without an Embedding key or index; **Find passages** is search-only and does not call the chat model. For cross-page retrieval:
+Open **Q&A Assistant** in the ribbon. Send a message to have the chat model synthesize document evidence, not just list search hits. **Current page** works without an Embedding key or index. Index settings, updates and search-only **Find passages (no model)** are in the **...** menu. For cross-page retrieval:
 
 1. Open **Index / MCP settings**. Configure a separate HTTPS Embedding endpoint and API key. Presets are `text-embedding-3-small` (1536 dimensions, default) and `text-embedding-3-large` (3072). Dimensions `0` means the model default; a custom model needs its actual dimensions.
 2. Select the notebooks, section groups or sections you authorize for indexing, then save. Parent consent includes future descendants; identifiers, not display names, define scope. Click **Update index** to upload authorized text for Embeddings.
@@ -127,7 +127,17 @@ No separately deployed vector database is needed. SQLite stores text, provenance
 
 OneNote hierarchy timestamps can differ from page-content timestamps. Reads compare each revision source separately and verify content stability. Index refresh checks accessible authorized pages locally, including pages whose hierarchy time did not change; only changed content needs new Embeddings. This local scan can take time for large scopes.
 
-Answers cite `[S1]` note sources separately from `[M1]` MCP results. Double-click a source to navigate to the note or inspect the tool receipt. Each follow-up retrieves fresh evidence; changing scope or service identity resets the conversation. **Save to current page** explicitly writes an answer and provenance to OneNote; changed or inaccessible sources must be refreshed first.
+Answers cite `[S1]` note sources separately from `[M1]` MCP results. Open **Sources** and select a turn to inspect its references, then double-click a source to navigate to the note or inspect the tool receipt. **Activity** expands retrieval and tool progress without taking over the conversation. Each follow-up retrieves fresh evidence; changing scope or service identity resets the conversation.
+
+**Enter** sends, **Shift+Enter** inserts a newline, and **Ctrl+Enter** queues a message. During an answer, Enter keeps the draft and prompts you to queue instead. Queued messages run serially after successful answers and retain the scope, active-page ID and settings captured when queued. Cancellation or failure pauses the queue; resume or remove pending messages explicitly. Changing scope/settings or starting a new chat clears queued messages, and closing the window cancels active work. Cancelling cannot roll back an already dispatched MCP operation. Chinese IME confirmation is not treated as Send.
+
+The composer has one circular send/cancel control with a white vector icon and a distinct disabled state. The note sidebar can be collapsed. Native rich text renders Markdown tables (including cell alignment and formatting), headings, nested lists, task lists, emphasis, links and fenced code blocks. **Copy answer** copies selected text, or the latest answer with source labels and notices, as both text and RTF for formatted paste. It does not write to OneNote or revalidate historical sources; incomplete answers are marked. The background UI message window stays hidden and is excluded from Alt+Tab.
+
+**Index / MCP settings → Answer display → Enable Mermaid diagram previews** is off by default. Enabling it checks for Microsoft Edge WebView2 Runtime; without it, normal rich-text answers still work. Complete `mermaid` code blocks then offer **View diagram**, opening a separate local preview. Mermaid assets ship with the add-in; the preview blocks external resource requests, navigation and diagram actions. Invalid syntax shows an error and retains the source. WebView2 is never installed automatically.
+
+Answer windows explicitly use the modern Windows RichEdit control, independent of OneNote's COM-host defaults. This keeps wrapped table text inside its cells and preserves Chinese diagram-link labels without exposing internal link targets.
+
+The offline Mermaid 12.0.0 bundle is vendored unchanged from `https://cdn.jsdelivr.net/npm/mermaid@12.0.0/dist/mermaid.min.js` (SHA256 `28FCA7AE6EBC7ED7BB63BDE63136A74BFEF14F296A57E403657EEB8B32836073`); retain its bundled notices when updating it.
 
 **Documents first, MCP on demand.** Each turn starts with the selected document evidence. If it suffices, the model answers without connecting to MCP, listing remote tools or executing them. Only the local discovery gateway is initially exposed. For an out-of-document question, essential evidence gap, necessary verification/freshness check or explicitly requested external action, the model can request discovery with a focused query and brief reason. The reason appears in the activity view, then relevant tools become available. Every follow-up makes this decision again; earlier MCP use does not automatically enable remote tools for the next turn.
 
@@ -229,6 +239,7 @@ To run only the DPI and UI regression scenarios (Windows 10 1703+):
 
 ```powershell
 .\tests\OneNoteAI.Tests\bin\Release\OneNoteAI.Tests.exe High-DPI WinForms
+.\tests\OneNoteAI.Tests\bin\Release\OneNoteAI.Tests.exe --legacy-rich-edit "COM-host rich-text" "Markdown tables" "High-DPI"
 ```
 
 The DPI scenario covers English and Chinese dialogs at 100%-300% scaling,
