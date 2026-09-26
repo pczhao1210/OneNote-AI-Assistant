@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace OneNoteAI.AI.Models
 {
@@ -19,6 +20,9 @@ namespace OneNoteAI.AI.Models
 
         [JsonProperty("max_tokens")]
         public int? MaxTokens { get; set; }
+
+        [JsonProperty("tools", NullValueHandling = NullValueHandling.Ignore)]
+        public List<ChatTool> Tools { get; set; }
     }
 
     public class ChatMessage
@@ -28,6 +32,15 @@ namespace OneNoteAI.AI.Models
 
         [JsonProperty("content")]
         public string Content { get; set; }
+
+        [JsonProperty("tool_calls", NullValueHandling = NullValueHandling.Ignore)]
+        public List<ToolCall> ToolCalls { get; set; }
+
+        [JsonProperty("tool_call_id", NullValueHandling = NullValueHandling.Ignore)]
+        public string ToolCallId { get; set; }
+
+        [JsonProperty("reasoning_content", NullValueHandling = NullValueHandling.Ignore)]
+        public string ReasoningContent { get; set; }
 
         public static ChatMessage System(string content)
         {
@@ -43,6 +56,42 @@ namespace OneNoteAI.AI.Models
         {
             return new ChatMessage { Role = "assistant", Content = content };
         }
+    }
+
+    public class ChatTool
+    {
+        [JsonProperty("type")]
+        public string Type { get; set; } = "function";
+        [JsonProperty("function")]
+        public ToolDefinition Function { get; set; }
+    }
+
+    public class ToolDefinition
+    {
+        [JsonProperty("name")]
+        public string Name { get; set; }
+        [JsonProperty("description")]
+        public string Description { get; set; }
+        [JsonProperty("parameters")]
+        public JObject Parameters { get; set; }
+    }
+
+    public class ToolCall
+    {
+        [JsonProperty("id")]
+        public string Id { get; set; }
+        [JsonProperty("type")]
+        public string Type { get; set; } = "function";
+        [JsonProperty("function")]
+        public ToolArguments Function { get; set; } = new ToolArguments();
+    }
+
+    public class ToolArguments
+    {
+        [JsonProperty("name")]
+        public string Name { get; set; }
+        [JsonProperty("arguments")]
+        public string Arguments { get; set; }
     }
 
     public class ChatResponse

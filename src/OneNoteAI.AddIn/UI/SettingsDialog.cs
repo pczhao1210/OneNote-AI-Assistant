@@ -13,6 +13,7 @@ namespace OneNoteAI.UI
 {
     public class SettingsDialog : Form
     {
+        private readonly AppSettings _draft = SettingsManager.Snapshot();
         // API + Model tab
         private readonly TextBox _txtApiKey;
         private readonly ComboBox _cmbProvider;
@@ -23,6 +24,8 @@ namespace OneNoteAI.UI
         private readonly ComboBox _cmbDefaultModel;
         private readonly NumericUpDown _numTemperature;
         private readonly NumericUpDown _numMaxTokens;
+        private readonly ComboBox _cmbTokenLimit;
+        private readonly ComboBox _cmbTemperatureMode;
 
         // Prompt tab
         private readonly TextBox _txtPromptSummarize;
@@ -120,12 +123,14 @@ namespace OneNoteAI.UI
             grpApi.Controls.Add(lblApiBaseUrl);
             grpApi.Controls.Add(_txtApiBaseUrl);
             grpApi.Controls.Add(_btnTestConnection);
+            grpApi.Controls.Add(new Label { Location = new Point(16, 139), Size = new Size(362, 32),
+                Text = KnowledgeUi.L("模型名可直接输入；兼容设置按服务商保存。", "Model ID is editable; settings are per provider.") });
 
             GroupBox grpModel = new GroupBox
             {
                 Text = "模型设置",
                 Location = new Point(10, 200),
-                Size = new Size(510, 155)
+                Size = new Size(510, 210)
             };
 
             _chkAutoSelectModel = new CheckBox
@@ -141,7 +146,7 @@ namespace OneNoteAI.UI
             _cmbDefaultModel = new ComboBox
             {
                 Location = new Point(90, 62),
-                Size = new Size(180, 23),
+                Size = new Size(398, 23),
                 DropDownStyle = ComboBoxStyle.DropDown
             };
             _cmbDefaultModel.Items.Add("deepseek-chat");
@@ -180,6 +185,17 @@ namespace OneNoteAI.UI
             grpModel.Controls.Add(_numTemperature);
             grpModel.Controls.Add(lblMaxTokens);
             grpModel.Controls.Add(_numMaxTokens);
+            _cmbTokenLimit = new ComboBox { Location = new Point(160, 132), Size = new Size(328, 23),
+                DropDownStyle = ComboBoxStyle.DropDownList };
+            _cmbTokenLimit.Items.AddRange(new object[] { KnowledgeUi.L("自动（推荐）", "Auto (recommended)"), "max_tokens", "max_completion_tokens" });
+            _cmbTemperatureMode = new ComboBox { Location = new Point(160, 167), Size = new Size(328, 23),
+                DropDownStyle = ComboBoxStyle.DropDownList };
+            _cmbTemperatureMode.Items.AddRange(new object[] { KnowledgeUi.L("自动（推荐）", "Auto (recommended)"),
+                KnowledgeUi.L("发送设置的温度", "Send configured temperature"), KnowledgeUi.L("不发送（模型默认）", "Omit (model default)") });
+            grpModel.Controls.Add(new Label { Text = KnowledgeUi.L("输出长度参数:", "Output limit field:"), AutoSize = true, Location = new Point(16, 136) });
+            grpModel.Controls.Add(_cmbTokenLimit);
+            grpModel.Controls.Add(new Label { Text = KnowledgeUi.L("温度参数:", "Temperature field:"), AutoSize = true, Location = new Point(16, 171) });
+            grpModel.Controls.Add(_cmbTemperatureMode);
 
             tabApi.Controls.Add(grpApi);
             tabApi.Controls.Add(grpModel);
@@ -213,6 +229,27 @@ namespace OneNoteAI.UI
 
             tabs.TabPages.Add(tabApi);
             tabs.TabPages.Add(tabPrompts);
+            var tabKnowledge = new TabPage(KnowledgeUi.L("知识与 MCP", "Knowledge and MCP"));
+            var knowledgeInfo = new Label { Dock = DockStyle.Top, Height = 90, Padding = new Padding(16),
+                Text = KnowledgeUi.L("配置云端 Embedding、本地索引授权范围，以及远程 HTTPS MCP 连接和逐工具审批。聊天 API Key 不会自动复用到这些服务。",
+                    "Configure cloud Embeddings, local indexing consent, remote HTTPS MCP connections and per-tool approval. Your chat API key is not reused for these services.") };
+            Button knowledgeSettings = Theme.CreatePrimaryButton(KnowledgeUi.L("打开知识设置", "Open knowledge settings"));
+            knowledgeSettings.SetBounds(16, 106, 230, 38);
+            knowledgeSettings.Click += async (s, e) =>
+            {
+                knowledgeSettings.Enabled = false;
+                try
+                {
+                    var source = new Knowledge.OneNoteSource();
+                    Knowledge.NoteNode hierarchy = await Task.Run(() => source.Hierarchy());
+                    using (var dialog = new KnowledgeSettingsDialog(hierarchy)) dialog.ShowDialog(this);
+                }
+                catch (Exception ex) { MessageBox.Show(this, ex.Message, Text, MessageBoxButtons.OK, MessageBoxIcon.Error); }
+                finally { if (!IsDisposed) knowledgeSettings.Enabled = true; }
+            };
+            tabKnowledge.Controls.Add(knowledgeSettings);
+            tabKnowledge.Controls.Add(knowledgeInfo);
+            tabs.TabPages.Add(tabKnowledge);
 
             // ── Footer buttons ──
             _btnOk = Theme.CreatePrimaryButton(Strings.OK);
@@ -225,7 +262,6 @@ namespace OneNoteAI.UI
             _btnCancel.Size = new Size(96, 34);
             _btnCancel.Location = new Point(480, 518);
             _btnCancel.DialogResult = DialogResult.Cancel;
-            _btnCancel.Click += delegate { SettingsManager.Load(); };
 
             Controls.Add(tabs);
             Controls.Add(_btnOk);
@@ -235,10 +271,6 @@ namespace OneNoteAI.UI
             CancelButton = _btnCancel;
 
             Load += OnDialogLoad;
-            FormClosing += delegate(object sender, FormClosingEventArgs e)
-            {
-                if (DialogResult != DialogResult.OK) SettingsManager.Load();
-            };
         }
 
         /// <summary>
@@ -291,10 +323,10 @@ namespace OneNoteAI.UI
 
         private void OnDialogLoad(object sender, EventArgs e)
         {
-            AppSettings settings = SettingsManager.Current;
+            AppSettings settings = _draft;
             SelectProvider(settings.Provider);
 
-            _txtApiKey.Text = SettingsManager.GetApiKey();
+            _txtApiKey.Text = KnowledgeUi.ReadSecret(settings.ApiKey, this);
             _txtApiBaseUrl.Text = settings.ApiBaseUrl ?? "https://api.deepseek.com";
             _chkAutoSelectModel.Checked = settings.AutoSelectModel;
 
@@ -314,6 +346,7 @@ namespace OneNoteAI.UI
                 maxTokens = 4096;
             }
             _numMaxTokens.Value = maxTokens;
+            LoadCompatibility();
 
             // Show current effective prompt (override if set, else default) so
             // the user sees what's actually being used; saving will only persist
@@ -360,15 +393,13 @@ namespace OneNoteAI.UI
                 return;
             }
 
-            AppSettings settings = SettingsManager.Current;
+            AppSettings settings = _draft;
             settings.ApiBaseUrl = apiBaseUrl;
             settings.DefaultModel = defaultModel;
             settings.AutoSelectModel = _chkAutoSelectModel.Checked;
             settings.Temperature = Convert.ToDouble(_numTemperature.Value);
             settings.MaxTokens = Decimal.ToInt32(_numMaxTokens.Value);
-            settings.Language = "zh-CN";
-            SettingsManager.GetActiveProviderSettings().ApiBaseUrl = apiBaseUrl;
-            SettingsManager.GetActiveProviderSettings().DefaultModel = defaultModel;
+            SettingsManager.GetActiveProviderSettings(settings).ChatApi = ReadCompatibility();
 
             if (settings.PromptOverrides == null) settings.PromptOverrides = new PromptOverrides();
             // Only persist as an override if it differs from the built-in default
@@ -379,8 +410,9 @@ namespace OneNoteAI.UI
             settings.PromptOverrides.QA = NormalizeOverride(_txtPromptQA.Text, PromptTemplates.QASystemDefault);
             settings.PromptOverrides.ExtractTodos = NormalizeOverride(_txtPromptExtractTodos.Text, PromptTemplates.ExtractTodosSystemDefault);
 
-            SettingsManager.Save();
-            SettingsManager.SetApiKey(apiKey);
+            settings.ApiKey = EncryptionHelper.Encrypt(apiKey);
+            settings.Knowledge = SettingsManager.Current.Knowledge;
+            SettingsManager.Save(settings);
 
             DialogResult = DialogResult.OK;
             Close();
@@ -399,7 +431,7 @@ namespace OneNoteAI.UI
             string apiBaseUrl = (_txtApiBaseUrl.Text ?? string.Empty).Trim();
             string model = (_cmbDefaultModel.Text ?? string.Empty).Trim();
 
-            if (string.IsNullOrWhiteSpace(apiKey) && SettingsManager.Current.Provider != AiProvider.Ollama)
+            if (string.IsNullOrWhiteSpace(apiKey) && _draft.Provider != AiProvider.Ollama)
             {
                 MessageBox.Show("请先输入 API Key。", "OneNote AI Assistant", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 _txtApiKey.Focus();
@@ -421,12 +453,12 @@ namespace OneNoteAI.UI
             _btnTestConnection.Enabled = false;
             try
             {
-                using (DeepseekClient client = new DeepseekClient(apiKey, apiBaseUrl))
+                using (DeepseekClient client = new DeepseekClient(apiKey, apiBaseUrl, _draft.Provider, requestOptions: ReadCompatibility()))
                 {
                     await client.SendAsync(new OneNoteAI.AI.Models.ChatRequest
                     {
                         Model = model,
-                        MaxTokens = 5,
+                        MaxTokens = 512,
                         Temperature = 0.0,
                         Messages = new System.Collections.Generic.List<OneNoteAI.AI.Models.ChatMessage>
                         {
@@ -444,101 +476,22 @@ namespace OneNoteAI.UI
             {
                 _btnTestConnection.Enabled = true;
             }
-            return;
-
-#pragma warning disable 162
-            if (SettingsManager.Current.Provider == AiProvider.Claude)
-            {
-                try
-                {
-                    using (DeepseekClient client = new DeepseekClient(apiKey, apiBaseUrl))
-                    {
-                        await client.SendAsync(new OneNoteAI.AI.Models.ChatRequest
-                        {
-                            Model = model,
-                            MaxTokens = 5,
-                            Temperature = 0.0,
-                            Messages = new System.Collections.Generic.List<OneNoteAI.AI.Models.ChatMessage>
-                            {
-                                OneNoteAI.AI.Models.ChatMessage.User("Hi")
-                            }
-                        });
-                    }
-                    MessageBox.Show("Connection test succeeded.", "OneNote AI Assistant", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show("Connection test failed: " + ex.Message, "OneNote AI Assistant", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                }
-                return;
-            }
-
-            _btnTestConnection.Enabled = false;
-
-            try
-            {
-                using (HttpClient client = new HttpClient())
-                {
-                    client.BaseAddress = baseUri;
-                    client.Timeout = TimeSpan.FromSeconds(30);
-                    client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
-
-                    object payload = new
-                    {
-                        model = model,
-                        messages = new[]
-                        {
-                            new { role = "user", content = "Hi" }
-                        },
-                        max_tokens = 5,
-                        temperature = 0.0
-                    };
-
-                    string json = JsonConvert.SerializeObject(payload);
-                    using (StringContent content = new StringContent(json, Encoding.UTF8, "application/json"))
-                    {
-                        HttpResponseMessage response = await client.PostAsync("/v1/chat/completions", content).ConfigureAwait(true);
-                        string responseText = await response.Content.ReadAsStringAsync().ConfigureAwait(true);
-
-                        if (response.IsSuccessStatusCode)
-                        {
-                            MessageBox.Show("连接测试成功。", "OneNote AI Assistant", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                        }
-                        else
-                        {
-                            MessageBox.Show(
-                                "连接测试失败：" + response.StatusCode + Environment.NewLine + responseText,
-                                "OneNote AI Assistant",
-                                MessageBoxButtons.OK,
-                                MessageBoxIcon.Error);
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show("连接测试失败：" + ex.Message, "OneNote AI Assistant", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
-            finally
-            {
-                _btnTestConnection.Enabled = true;
-            }
         }
-#pragma warning restore 162
 
         private void OnProviderChanged(object sender, EventArgs e)
         {
             ProviderListItem selected = _cmbProvider.SelectedItem as ProviderListItem;
             if (!IsHandleCreated || selected == null) return;
             AiProvider provider = selected.Provider;
-            if (provider == SettingsManager.Current.Provider) return;
+            if (provider == _draft.Provider) return;
             PersistActiveProviderDraft();
-            SettingsManager.SwitchProvider(provider);
-            AppSettings settings = SettingsManager.Current;
-            _txtApiKey.Text = SettingsManager.GetApiKey();
+            SettingsManager.SwitchProvider(provider, _draft);
+            AppSettings settings = _draft;
+            _txtApiKey.Text = KnowledgeUi.ReadSecret(settings.ApiKey, this);
             _txtApiBaseUrl.Text = settings.ApiBaseUrl;
             AddRecommendedModels(provider);
             _cmbDefaultModel.Text = settings.DefaultModel;
+            LoadCompatibility();
         }
 
         private void AddRecommendedModels(AiProvider provider)
@@ -561,15 +514,30 @@ namespace OneNoteAI.UI
 
         private void PersistActiveProviderDraft()
         {
-            AppSettings settings = SettingsManager.Current;
+            AppSettings settings = _draft;
             string plainKey = (_txtApiKey.Text ?? string.Empty).Trim();
             settings.ApiKey = EncryptionHelper.Encrypt(plainKey);
             settings.ApiBaseUrl = (_txtApiBaseUrl.Text ?? string.Empty).Trim();
             settings.DefaultModel = (_cmbDefaultModel.Text ?? string.Empty).Trim();
-            ProviderSettings profile = SettingsManager.GetActiveProviderSettings();
+            ProviderSettings profile = SettingsManager.GetActiveProviderSettings(settings);
             profile.ApiKey = settings.ApiKey;
             profile.ApiBaseUrl = settings.ApiBaseUrl;
             profile.DefaultModel = settings.DefaultModel;
+            profile.ChatApi = ReadCompatibility();
+        }
+
+        private ChatApiOptions ReadCompatibility() => new ChatApiOptions
+        {
+            TokenLimit = (TokenLimitParameter)Math.Max(0, _cmbTokenLimit.SelectedIndex),
+            Temperature = (TemperatureParameter)Math.Max(0, _cmbTemperatureMode.SelectedIndex)
+        };
+
+        private void LoadCompatibility()
+        {
+            ChatApiOptions options = _draft.GetChatApiOptions();
+            _cmbTokenLimit.SelectedIndex = (int)options.TokenLimit;
+            _cmbTemperatureMode.SelectedIndex = (int)options.Temperature;
+            _cmbTokenLimit.Enabled = _draft.Provider != AiProvider.Claude;
         }
 
         private void SelectProvider(AiProvider provider)

@@ -28,6 +28,13 @@ namespace OneNoteAI.OneNote
 
         internal IOneNoteApplication App => _app;
 
+        public string GetCurrentPageId()
+        {
+            string id = _app.GetWindows()?.CurrentWindow?.CurrentPageId;
+            if (string.IsNullOrWhiteSpace(id)) throw new InvalidOperationException("No current OneNote page.");
+            return id;
+        }
+
         public PageContent GetCurrentPage()
         {
             Windows windows = _app.GetWindows();
